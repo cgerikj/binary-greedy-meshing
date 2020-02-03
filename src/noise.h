@@ -18,6 +18,9 @@ public:
     noise->SetPerturbType(FastNoiseSIMD::Gradient);
     noise->SetPerturbAmp(0.4);
     noise->SetPerturbFrequency(0.4);
+
+    whiteNoise = FastNoiseSIMD::NewFastNoiseSIMD();
+    whiteNoise->SetNoiseType(FastNoiseSIMD::WhiteNoise);
   }
 
   void generateTerrain(std::vector<uint8_t>& voxels, int seed) {
@@ -45,7 +48,29 @@ public:
     FastNoiseSIMD::FreeNoiseSet(noiseMap);
   }
 
+  void generateWhiteNoiseTerrain(std::vector<uint8_t>& voxels, int seed) {
+    whiteNoise->SetSeed(seed);
+
+    float* noiseMap = whiteNoise->GetWhiteNoiseSet(0, 0, 0, CS_P, CS_P, CS_P);
+
+    for (int i = CS_P3; i--;) {
+      float noise = (noiseMap[i] + 1.0f) / 2.0f;
+      if (noise > 0.8f) {
+        voxels.at(i) = 1;
+      } 
+      else if (noise > 0.6f) {
+        voxels.at(i) = 2;
+      }
+      else if (noise > 0.5f) {
+        voxels.at(i) = 3;
+      }
+    }
+
+    FastNoiseSIMD::FreeNoiseSet(noiseMap);
+  }
+
   FastNoiseSIMD* noise;
+  FastNoiseSIMD* whiteNoise;
 };
 
 #endif

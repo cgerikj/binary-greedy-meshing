@@ -101,6 +101,14 @@ Noise noise;
 float last_x = 0.0f;
 float last_y = 0.0f;
 
+enum class MESH_TYPE: int {
+  TERRAIN,
+  RANDOM,
+  Count
+};
+
+int mesh_type = (int)MESH_TYPE::TERRAIN;
+
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   camera->processMouseMovement(xpos - last_x, last_y - ypos);
   last_x = xpos;
@@ -126,6 +134,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
     create_chunk();
   }
+
+  else if (key == GLFW_KEY_TAB && action == GLFW_RELEASE) {
+    mesh_type++;
+    if (mesh_type >= (int)MESH_TYPE::Count) {
+      mesh_type = 0;
+    }
+    create_chunk();
+  }
 }
 
 struct Attribute {
@@ -141,7 +157,18 @@ int vertexCount = 0;
 void create_chunk() {
   std::vector<uint8_t> voxels(CS_P3);
   std::fill(voxels.begin(), voxels.end(), 0);
-  noise.generateTerrain(voxels, std::rand());
+
+  switch (mesh_type) {
+    case MESH_TYPE::TERRAIN: {
+      noise.generateTerrain(voxels, std::rand());
+      break;
+    }
+
+    case MESH_TYPE::RANDOM: {
+      noise.generateWhiteNoiseTerrain(voxels, std::rand());
+      break;
+    }
+  }
 
   std::vector<uint8_t> light_map(CS_P3);
   std::fill(light_map.begin(), light_map.end(), 0);
@@ -158,6 +185,10 @@ void create_chunk() {
     glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(Vertex), vertices->data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+
+    vertices->clear();
+    vertices->shrink_to_fit();
+    delete vertices;
   }
 
   printf("vertex count: %i\n", vertexCount);

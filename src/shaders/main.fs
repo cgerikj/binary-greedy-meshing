@@ -17,8 +17,12 @@ void main() {
   vec3 final_color;
   if (frag_type == 1) {
    final_color = vec3(0.6, 0.1, 0.1);
-  } else {
+  }
+  else if (frag_type == 2) {
    final_color = vec3(0.1, 0.6, 0.1);
+  }
+  else {
+   final_color = vec3(0.1, 0.1, 0.6);
   }
 
   vec3 L = normalize(sun_position - frag_pos);
