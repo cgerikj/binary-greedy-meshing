@@ -13,6 +13,8 @@
 #include "noise.h"
 #include "light.h"
 
+void create_chunk();
+
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -84,8 +86,6 @@ bool init_opengl() {
 
   glEnable(GL_MULTISAMPLE);
 
-  // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
   return true;
 };
 
@@ -107,12 +107,61 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   last_y = ypos;
 }
 
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+  if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
+    glfwSetWindowShouldClose(window, true);
+  }
+
+  else if (key == GLFW_KEY_X && action == GLFW_RELEASE) {
+    GLint lastPolyMode[2];
+    glGetIntegerv(GL_POLYGON_MODE, lastPolyMode);
+    if (lastPolyMode[0] == GL_FILL) {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
+    else {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
+  }
+
+  else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
+    create_chunk();
+  }
+}
+
 struct Attribute {
   GLuint type;
   GLuint type_size;
   GLuint length;
   bool int_type;
 };
+
+GLuint VAO, VBO;
+int vertexCount = 0;
+
+void create_chunk() {
+  std::vector<uint8_t> voxels(CS_P3);
+  std::fill(voxels.begin(), voxels.end(), 0);
+  noise.generateTerrain(voxels, std::rand());
+
+  std::vector<uint8_t> light_map(CS_P3);
+  std::fill(light_map.begin(), light_map.end(), 0);
+  calculate_light(voxels, light_map);
+
+  auto vertices = mesh(voxels, light_map, glm::ivec3(0));
+  if (vertices == nullptr) {
+    vertexCount = 0;
+  } else {
+    vertexCount = vertices->size();
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(Vertex), vertices->data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+  }
+
+  printf("vertex count: %i\n", vertexCount);
+}
 
 int main(int argc, char* argv[]) {
   glfwSetErrorCallback(glfw_error_callback);
@@ -130,26 +179,12 @@ int main(int argc, char* argv[]) {
   glfwSwapInterval(1);
 
   glfwSetCursorPosCallback(window, mouse_callback);
+  glfwSetKeyCallback(window, key_callback);
 
   if (!init_opengl()) {
     fprintf(stderr, "Unable to initialize glad/opengl\n");
     return 1;
-  }
-
-  std::vector<uint8_t> voxels(CS_P3);
-  std::fill(voxels.begin(), voxels.end(), 0);
-  noise.generateTerrain(voxels);
-
-  std::vector<uint8_t> light_map(CS_P3);
-  std::fill(light_map.begin(), light_map.end(), 0);
-  calculate_light(voxels, light_map);
-
-  auto vertices = mesh(voxels, light_map, glm::ivec3(0));
-  if (vertices == nullptr) {
-    printf("no vertices, exiting\n");
-    exit(1);
-  }
-  printf("vertex count: %i\n", vertices->size());
+  }  
 
   std::vector<Attribute> attributes = {
     { GL_SHORT, sizeof(GLshort), 3, false },
@@ -158,7 +193,6 @@ int main(int argc, char* argv[]) {
     { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true }
   };
 
-  GLuint VAO, VBO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
 
@@ -182,11 +216,7 @@ int main(int argc, char* argv[]) {
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, vertices->size() * sizeof(Vertex), vertices->data(), GL_STATIC_DRAW);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glBindVertexArray(0);
+  create_chunk();
 
   shader = new Shader("main", "main");
   skyboxShader = new Shader("skybox", "skybox");
@@ -195,9 +225,11 @@ int main(int argc, char* argv[]) {
 
   Skybox skybox;
 
+  srand(time(NULL));
+
   float forwardMove = 0.0f;
   float rightMove = 0.0f;
-  float noclipSpeed = 0.05f;
+  float noclipSpeed = .0f;
 
   float deltaTime = 0.0f;
 
@@ -207,6 +239,7 @@ int main(int argc, char* argv[]) {
 
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) forwardMove = 1.0f;
     else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) forwardMove = -1.0f;
@@ -224,13 +257,15 @@ int main(int argc, char* argv[]) {
     auto skybox_viewmatrix = glm::mat4(glm::mat3(camera->getViewMatrix()));
     skybox.render(*skyboxShader, skybox_viewmatrix);
 
-    shader->use();
-    shader->setMat4("u_projection", camera->projection);
-    shader->setMat4("u_view", camera->getViewMatrix());
-    shader->setVec3("eye_position", camera->position);
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, vertices->size());
-    glBindVertexArray(0);
+    if (vertexCount > 0) {
+      shader->use();
+      shader->setMat4("u_projection", camera->projection);
+      shader->setMat4("u_view", camera->getViewMatrix());
+      shader->setVec3("eye_position", camera->position);
+      glBindVertexArray(VAO);
+      glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+      glBindVertexArray(0);
+    }
 
     glfwSwapBuffers(window);
     glfwPollEvents();

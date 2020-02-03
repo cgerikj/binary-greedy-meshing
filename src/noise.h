@@ -10,7 +10,6 @@ class Noise {
 public:
   Noise() {
     noise = FastNoiseSIMD::NewFastNoiseSIMD();
-    noise->SetSeed(1337);
     noise->SetNoiseType(FastNoiseSIMD::SimplexFractal);
     noise->SetFrequency(0.05);
     noise->SetFractalType(FastNoiseSIMD::FBM);
@@ -21,7 +20,9 @@ public:
     noise->SetPerturbFrequency(0.4);
   }
 
-  void generateTerrain(std::vector<uint8_t>& voxels) {
+  void generateTerrain(std::vector<uint8_t>& voxels, int seed) {
+    noise->SetSeed(seed);
+
     float* noiseMap = noise->GetSampledNoiseSet(0, 0, 0, CS_P, CS_P, CS_P, 2);
 
     for (int i = CS_P3; i--;) {
