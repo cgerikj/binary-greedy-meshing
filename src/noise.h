@@ -12,7 +12,7 @@ public:
     noise = FastNoiseSIMD::NewFastNoiseSIMD();
     noise->SetSeed(1337);
     noise->SetNoiseType(FastNoiseSIMD::SimplexFractal);
-    noise->SetFrequency(0.005);
+    noise->SetFrequency(0.05);
     noise->SetFractalType(FastNoiseSIMD::FBM);
     noise->SetFractalOctaves(5);
     noise->SetFractalLacunarity(2.0);
@@ -29,8 +29,15 @@ public:
 
       int y = i / CS_P2;
 
-      if (noise > 0.5f) {
-          voxels.at(i) = 1;
+      if (noise > glm::smoothstep(0.15f, 1.0f, (float)y / (float)CS_P)) {
+        switch (voxels.at(i + CS_P2)) {
+          case 0:
+            voxels.at(i) = 2;
+            break;
+          default:
+            voxels.at(i) = 1;
+            break;
+        }
       }
     }
 

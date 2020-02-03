@@ -11,6 +11,7 @@
 #include "camera.h"
 #include "skybox.h"
 #include "noise.h"
+#include "light.h"
 
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -73,6 +74,8 @@ bool init_opengl() {
   glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
   glDebugMessageCallback(message_callback, 0);
 
+  glEnable(GL_DEPTH_TEST);
+
   glFrontFace(GL_CCW);
   glCullFace(GL_BACK);
   glEnable(GL_CULL_FACE);
@@ -134,29 +137,36 @@ int main(int argc, char* argv[]) {
   }
 
   std::vector<uint8_t> voxels(CS_P3);
+  std::fill(voxels.begin(), voxels.end(), 0);
   noise.generateTerrain(voxels);
 
   std::vector<uint8_t> light_map(CS_P3);
-  std::fill(light_map.begin(), light_map.end(), 15);
+  std::fill(light_map.begin(), light_map.end(), 0);
+  calculate_light(voxels, light_map);
 
   auto vertices = mesh(voxels, light_map, glm::ivec3(0));
+  if (vertices == nullptr) {
+    printf("no vertices, exiting\n");
+    exit(1);
+  }
   printf("vertex count: %i\n", vertices->size());
 
-  unsigned int VAO, VBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
   std::vector<Attribute> attributes = {
-      { GL_SHORT, sizeof(GLshort), 3, false },
-      { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true },
-      { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true },
-      { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true }
+    { GL_SHORT, sizeof(GLshort), 3, false },
+    { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true },
+    { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true },
+    { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true }
   };
 
+  GLuint VAO, VBO;
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBindVertexArray(VAO);
   for (unsigned int i = 0; i < attributes.size(); ++i) {
     glEnableVertexAttribArray(i);
   }
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
   unsigned int offset = 0;
   int i = 0;
   for (auto attr : attributes) {
@@ -174,19 +184,39 @@ int main(int argc, char* argv[]) {
 
   glBindVertexArray(VAO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), &vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, vertices->size() * sizeof(Vertex), vertices->data(), GL_STATIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
   shader = new Shader("main", "main");
   skyboxShader = new Shader("skybox", "skybox");
-  camera = new Camera(glm::vec3(100, 0, 100));
+  camera = new Camera(glm::vec3(31, 65, -5));
   camera->handleResolution(1280, 720);
 
   Skybox skybox;
 
+  float forwardMove = 0.0f;
+  float rightMove = 0.0f;
+  float noclipSpeed = 0.05f;
+
+  float deltaTime = 0.0f;
+
+  auto lastFrame = glfwGetTime();
   while (!glfwWindowShouldClose(window)) {
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    float currentFrame = glfwGetTime();
+    deltaTime = currentFrame - lastFrame;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) forwardMove = 1.0f;
+    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) forwardMove = -1.0f;
+    else forwardMove = 0.0f;
+
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) rightMove = 1.0f;
+    else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) rightMove = -1.0f;
+    else rightMove = 0.0f;
+    auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
+    camera->position += noclipSpeed * wishdir * deltaTime;
 
     skyboxShader->use();
     skyboxShader->setMat4("u_projection", camera->projection);

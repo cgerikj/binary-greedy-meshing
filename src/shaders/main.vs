@@ -13,7 +13,6 @@ out vec3 frag_normal;
 out vec3 frag_pos;
 flat out float frag_light;
 flat out uint frag_type;
-out vec2 frag_uv;
 
 uniform vec3 NORMALS[6] = {
   vec3( 0, 1, 0 ),
