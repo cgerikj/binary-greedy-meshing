@@ -11,5 +11,6 @@ Release
 cmake_install.cmake
 libraries/*
 !libraries/include
+!libraries/glad
 RelWithDebInfo
 resources
