@@ -9,10 +9,8 @@
 #include "constants.h"
 
 struct Vertex {
-  short px, py, pz;
-  uint8_t type;
-  uint8_t light;
-  uint8_t normal;
+  uint32_t data_a;
+  uint32_t data_b;
 };
 
 // MSVC specific ctz
@@ -27,6 +25,15 @@ inline const int get_axis_i(const int &axis, const int &a, const int &b, const i
   if (axis == 0) return b + (a * CS_P) + (c * CS_P2);
   else if (axis == 1) return a + (c * CS_P) + (b* CS_P2);
   else return c + (b * CS_P) + (a * CS_P2);
+}
+
+inline const void insert_quad(std::vector<Vertex>* vertices, uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t light, uint32_t norm) {
+  vertices->insert(vertices->end(),
+    {
+      (type << 24) | (y << 14) | x,
+      (norm << 22) | (light << 14) | z,
+    }
+   );
 }
 
 // voxels - 64^3 (includes neighboring voxels)
@@ -138,64 +145,52 @@ std::vector<Vertex>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& li
           merged_right[bit_pos] = 0;
 
           if (face == 0) {
-            vertices->insert(vertices->end(), {
-              { SX + mesh_left,  SY + mesh_up, SZ + mesh_front, type, light, 0 },
-              { SX + mesh_left,  SY + mesh_up, SZ + mesh_back,  type, light, 0 },
-              { SX + mesh_right, SY + mesh_up, SZ + mesh_back,  type, light, 0 },
-              { SX + mesh_right, SY + mesh_up, SZ + mesh_back,  type, light, 0 },
-              { SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 0 },
-              { SX + mesh_left,  SY + mesh_up, SZ + mesh_front, type, light, 0 }
-            });
+            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_front, type, light, 0);
+            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_back, type, light, 0);
+            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_back, type, light, 0);
+            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_back, type, light, 0);
+            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 0);
+            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_front, type, light, 0);
           }
           else if (face == 1) {
-            vertices->insert(vertices->end(), {
-              { SX + mesh_left,  SY + mesh_up, SZ + mesh_back,  type, light, 1 },
-              { SX + mesh_left,  SY + mesh_up, SZ + mesh_front, type, light, 1 },
-              { SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 1 },
-              { SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 1},
-              { SX + mesh_right, SY + mesh_up, SZ + mesh_back,  type, light, 1 },
-              { SX + mesh_left,  SY + mesh_up, SZ + mesh_back,  type, light, 1 }
-            });
+            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_back, type, light, 1);
+            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_front, type, light, 1);
+            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 1);
+            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 1);
+            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_back, type, light, 1);
+            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_back, type, light, 1);
           }
           else if (face == 2) {
-            vertices->insert(vertices->end(), {
-              { SX + mesh_up,  SY + mesh_front, SZ + mesh_left,  type, light, 2 },
-              { SX + mesh_up,  SY + mesh_back,  SZ + mesh_left,  type, light, 2 },
-              { SX + mesh_up,  SY + mesh_back,  SZ + mesh_right, type, light, 2 },
-              { SX + mesh_up,  SY + mesh_back,  SZ + mesh_right, type, light, 2 },
-              { SX + mesh_up,  SY + mesh_front, SZ + mesh_right, type, light, 2 },
-              { SX + mesh_up,  SY + mesh_front, SZ + mesh_left,  type, light, 2 }
-            });
+            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_left, type, light, 2);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_left, type, light, 2);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_right, type, light, 2);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_right, type, light, 2);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_right, type, light, 2);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_left, type, light, 2);
           }
           else if (face == 3) {
-            vertices->insert(vertices->end(), {
-              { SX + mesh_up,  SY + mesh_back,  SZ + mesh_left,  type, light, 3 },
-              { SX + mesh_up,  SY + mesh_front, SZ + mesh_left,  type, light, 3 },
-              { SX + mesh_up,  SY + mesh_front, SZ + mesh_right, type, light, 3 },
-              { SX + mesh_up,  SY + mesh_front, SZ + mesh_right, type, light, 3 },
-              { SX + mesh_up,  SY + mesh_back,  SZ + mesh_right, type, light, 3 },
-              { SX + mesh_up,  SY + mesh_back,  SZ + mesh_left,  type, light, 3 }
-            });
+            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_left, type, light, 3);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_left, type, light, 3);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_right, type, light, 3);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_right, type, light, 3);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_right, type, light, 3);
+            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_left, type, light, 3);
           }
           else if (face == 4) {
-            vertices->insert(vertices->end(), {
-              { SX + mesh_front, SY + mesh_left,  SZ + mesh_up, type, light, 4 },
-              { SX + mesh_back,  SY + mesh_left,  SZ + mesh_up, type, light, 4 },
-              { SX + mesh_back,  SY + mesh_right, SZ + mesh_up, type, light, 4 },
-              { SX + mesh_back,  SY + mesh_right, SZ + mesh_up, type, light, 4 },
-              { SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 4 },
-              { SX + mesh_front, SY + mesh_left,  SZ + mesh_up, type, light, 4 }
-            });
+            insert_quad(vertices, SX + mesh_front, SY + mesh_left, SZ + mesh_up, type, light, 4);
+            insert_quad(vertices, SX + mesh_back, SY + mesh_left, SZ + mesh_up, type, light, 4);
+            insert_quad(vertices, SX + mesh_back, SY + mesh_right, SZ + mesh_up, type, light, 4);
+            insert_quad(vertices, SX + mesh_back, SY + mesh_right, SZ + mesh_up, type, light, 4);
+            insert_quad(vertices, SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 4);
+            insert_quad(vertices, SX + mesh_front, SY + mesh_left, SZ + mesh_up, type, light, 4);
           }
           else if (face == 5) {
-            vertices->insert(vertices->end(), {
-              { SX + mesh_back,  SY + mesh_left,  SZ + mesh_up, type, light, 5 },
-              { SX + mesh_front, SY + mesh_left,  SZ + mesh_up, type, light, 5 },
-              { SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 5 },
-              { SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 5 },
-              { SX + mesh_back,  SY + mesh_right, SZ + mesh_up, type, light, 5 },
-              { SX + mesh_back,  SY + mesh_left,  SZ + mesh_up, type, light, 5 }
-            });
+            insert_quad(vertices, SX + mesh_back, SY + mesh_left, SZ + mesh_up, type, light, 5);
+            insert_quad(vertices, SX + mesh_front, SY + mesh_left, SZ + mesh_up, type, light, 5);
+            insert_quad(vertices, SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 5);
+            insert_quad(vertices, SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 5);
+            insert_quad(vertices, SX + mesh_back, SY + mesh_right, SZ + mesh_up, type, light, 5);
+            insert_quad(vertices, SX + mesh_back, SY + mesh_left, SZ + mesh_up, type, light, 5);
           }
         }
       }

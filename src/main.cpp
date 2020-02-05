@@ -159,12 +159,12 @@ void create_chunk() {
   std::fill(voxels.begin(), voxels.end(), 0);
 
   switch (mesh_type) {
-    case MESH_TYPE::TERRAIN: {
+    case (int)MESH_TYPE::TERRAIN: {
       noise.generateTerrain(voxels, std::rand());
       break;
     }
 
-    case MESH_TYPE::RANDOM: {
+    case (int)MESH_TYPE::RANDOM: {
       noise.generateWhiteNoiseTerrain(voxels, std::rand());
       break;
     }
@@ -218,10 +218,7 @@ int main(int argc, char* argv[]) {
   }  
 
   std::vector<Attribute> attributes = {
-    { GL_SHORT, sizeof(GLshort), 3, false },
-    { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true },
-    { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true },
-    { GL_UNSIGNED_BYTE, sizeof(GLubyte), 1, true }
+    { GL_UNSIGNED_INT, sizeof(GLuint), 2, true }
   };
 
   glGenVertexArrays(1, &VAO);
@@ -260,7 +257,7 @@ int main(int argc, char* argv[]) {
 
   float forwardMove = 0.0f;
   float rightMove = 0.0f;
-  float noclipSpeed = .0f;
+  float noclipSpeed = 10.0f;
 
   float deltaTime = 0.0f;
 
