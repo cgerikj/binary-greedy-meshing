@@ -8,9 +8,9 @@
 #include "timer.h"
 #include "constants.h"
 
-struct Vertex {
-  uint32_t data_a;
-  uint32_t data_b;
+struct Mesh {
+  std::vector<uint32_t>* vertices;
+  std::vector<uint32_t>* indices;
 };
 
 // MSVC specific ctz
@@ -27,24 +27,23 @@ inline const int get_axis_i(const int &axis, const int &a, const int &b, const i
   else return c + (b * CS_P) + (a * CS_P2);
 }
 
-inline const void insert_quad(std::vector<Vertex>* vertices, uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t light, uint32_t norm) {
+inline const void insert_quad(std::vector<uint32_t>* vertices, uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t light, uint32_t norm) {
   vertices->insert(vertices->end(),
     {
-      (type << 24) | (y << 14) | x,
-      (norm << 22) | (light << 14) | z,
+      (norm << 27) | (light << 23) | (type << 18) | (z << 12) | (y << 6) | x
     }
    );
 }
 
 // voxels - 64^3 (includes neighboring voxels)
 // light_map - ^
-std::vector<Vertex>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& light_map, glm::ivec3 pos) {
+std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& light_map) {
   Timer timer("meshing", true);
 
   uint64_t axis_cols[CS_P2 * 3] = { 0 };
   uint64_t col_face_masks[CS_P2 * 6];
 
-  auto vertices = new std::vector<Vertex>();
+  auto vertices = new std::vector<uint32_t>();
 
   // Step 1: Convert to binary representation for each direction
   auto p = voxels.begin();
@@ -71,11 +70,6 @@ std::vector<Vertex>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& li
       col_face_masks[(CS_P2 * (axis * 2 + 1)) + i] = col & ~((col << 1) | 1ULL);
     }
   }
-
-  // world offset
-  const short SX = (pos.x * CS) - 1;
-  const short SY = (pos.y * CS) - 1;
-  const short SZ = (pos.z * CS) - 1;
 
   // Step 3: Greedy meshing
   for (int face = 0; face < 6; face++) {
@@ -145,52 +139,52 @@ std::vector<Vertex>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& li
           merged_right[bit_pos] = 0;
 
           if (face == 0) {
-            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_front, type, light, 0);
-            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_back, type, light, 0);
-            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_back, type, light, 0);
-            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_back, type, light, 0);
-            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 0);
-            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_front, type, light, 0);
+            insert_quad(vertices, mesh_left, mesh_up, mesh_front, type, light, face);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_back, type, light, face);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_back, type, light, face);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_back, type, light, face);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face);
+            insert_quad(vertices, mesh_left, mesh_up, mesh_front, type, light, face);
           }
           else if (face == 1) {
-            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_back, type, light, 1);
-            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_front, type, light, 1);
-            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 1);
-            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_front, type, light, 1);
-            insert_quad(vertices, SX + mesh_right, SY + mesh_up, SZ + mesh_back, type, light, 1);
-            insert_quad(vertices, SX + mesh_left, SY + mesh_up, SZ + mesh_back, type, light, 1);
+            insert_quad(vertices, mesh_left, mesh_up, mesh_back, type, light, face);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_back, type, light, face);
+            insert_quad(vertices, mesh_left, mesh_up, mesh_back, type, light, face);
           }
           else if (face == 2) {
-            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_left, type, light, 2);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_left, type, light, 2);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_right, type, light, 2);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_right, type, light, 2);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_right, type, light, 2);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_left, type, light, 2);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_left, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_back, mesh_left, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_back, mesh_right, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_back, mesh_right, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_left, type, light, face);
           }
           else if (face == 3) {
-            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_left, type, light, 3);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_left, type, light, 3);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_right, type, light, 3);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_front, SZ + mesh_right, type, light, 3);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_right, type, light, 3);
-            insert_quad(vertices, SX + mesh_up, SY + mesh_back, SZ + mesh_left, type, light, 3);
+            insert_quad(vertices, mesh_up, mesh_back, mesh_left, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_left, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_back, mesh_right, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_back, mesh_left, type, light, face);
           }
           else if (face == 4) {
-            insert_quad(vertices, SX + mesh_front, SY + mesh_left, SZ + mesh_up, type, light, 4);
-            insert_quad(vertices, SX + mesh_back, SY + mesh_left, SZ + mesh_up, type, light, 4);
-            insert_quad(vertices, SX + mesh_back, SY + mesh_right, SZ + mesh_up, type, light, 4);
-            insert_quad(vertices, SX + mesh_back, SY + mesh_right, SZ + mesh_up, type, light, 4);
-            insert_quad(vertices, SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 4);
-            insert_quad(vertices, SX + mesh_front, SY + mesh_left, SZ + mesh_up, type, light, 4);
+            insert_quad(vertices, mesh_front, mesh_left, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_back, mesh_left, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_back, mesh_right, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_back, mesh_right, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_front,mesh_right,mesh_up, type, light, face);
+            insert_quad(vertices, mesh_front, mesh_left, mesh_up, type, light, face);
           }
           else if (face == 5) {
-            insert_quad(vertices, SX + mesh_back, SY + mesh_left, SZ + mesh_up, type, light, 5);
-            insert_quad(vertices, SX + mesh_front, SY + mesh_left, SZ + mesh_up, type, light, 5);
-            insert_quad(vertices, SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 5);
-            insert_quad(vertices, SX + mesh_front, SY + mesh_right, SZ + mesh_up, type, light, 5);
-            insert_quad(vertices, SX + mesh_back, SY + mesh_right, SZ + mesh_up, type, light, 5);
-            insert_quad(vertices, SX + mesh_back, SY + mesh_left, SZ + mesh_up, type, light, 5);
+            insert_quad(vertices, mesh_back, mesh_left, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_front, mesh_left, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_back, mesh_right, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_back, mesh_left, mesh_up, type, light, face);
           }
         }
       }

@@ -10,7 +10,7 @@ void calculate_light(std::vector<uint8_t>& voxels, std::vector<uint8_t>& light_m
       for (int zx = 0; zx < CS_P2; zx++) {
         int i = (y * CS_P2) + zx;
         if (y == CS_P - 1) {
-          light_map.at(i) = 31;
+          light_map.at(i) = 15;
         }
         else {
           auto light_above = light_map.at(i + CS_P2);
@@ -19,7 +19,7 @@ void calculate_light(std::vector<uint8_t>& voxels, std::vector<uint8_t>& light_m
             light_map.at(i) = light_above;
           }
           else {
-            light_map.at(i) = 16;
+            light_map.at(i) = 4;
           }
         }
       }

@@ -12,6 +12,17 @@ cmake -G "Visual Studio 16 2019" .
 
 Open binaryMesher.sln
 
+## Mesh details
+
+Vertex data is packed into one unsigned integer:
+- x, y, z: 6 bit each (0-63)
+- Type: 5 bit (0-31)
+- Light: 4 bit (0-15)
+- Normal: 3 bit (0-5)
+- 2 bit remain unused, can be used for AO or more type/light values
+
+Meshes can be offset to world space using a per-draw uniform or by packing xyz in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
+
 ## Usage
 
 - Noclip: WASD

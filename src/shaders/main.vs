@@ -1,6 +1,6 @@
 #version 430 core
 
-layout (location = 0) in uvec2 data;
+layout (location = 0) in uint data;
 uniform mat4 u_view;
 uniform mat4 u_projection;
 
@@ -20,18 +20,18 @@ uniform vec3 NORMALS[6] = {
 };
 
 void main() {
-  float x = float(data[0]&(63));
-  float y = float((data[0] >> 14)&(63));
-  uint type = (data[0] >> 24)&(63);
-
-  float z = float(data[1]&(63));
-  uint light = (data[1] >> 14)&(63);
-  uint norm = (data[1] >> 22)&(63);
+  float x = float(data&63);
+  float y = float((data >> 6)&63);
+  float z = float((data >> 12)&63);
+  uint type  = (data >> 18)&31;
+  uint light = (data >> 23)&15;
+  uint norm  = (data >> 27)&7;
+  // 2 bit left for ao
 
   frag_pos = vec3(x, y, z) - vec3(0.5);
   frag_viewspace = u_view * vec4(frag_pos, 1);
   frag_normal = NORMALS[norm];
-  frag_light = float(light) / 32.0;
+  frag_light = float(light) / 16.0;
   frag_type = type;
   
   gl_Position = u_projection * frag_viewspace;

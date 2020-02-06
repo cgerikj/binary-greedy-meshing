@@ -9,7 +9,6 @@
 #include "mesher.h"
 #include "shader.h"
 #include "camera.h"
-#include "skybox.h"
 #include "noise.h"
 #include "light.h"
 
@@ -94,7 +93,6 @@ void glfw_error_callback(int error, const char* description) {
 }
 
 Shader* shader = nullptr;
-Shader* skyboxShader = nullptr;
 Camera* camera = nullptr;
 Noise noise;
 
@@ -144,13 +142,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   }
 }
 
-struct Attribute {
-  GLuint type;
-  GLuint type_size;
-  GLuint length;
-  bool int_type;
-};
-
 GLuint VAO, VBO;
 int vertexCount = 0;
 
@@ -174,7 +165,7 @@ void create_chunk() {
   std::fill(light_map.begin(), light_map.end(), 0);
   calculate_light(voxels, light_map);
 
-  auto vertices = mesh(voxels, light_map, glm::ivec3(0));
+  auto vertices = mesh(voxels, light_map);
   if (vertices == nullptr) {
     vertexCount = 0;
   } else {
@@ -182,7 +173,7 @@ void create_chunk() {
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(Vertex), vertices->data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(uint32_t), vertices->data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
@@ -215,43 +206,23 @@ int main(int argc, char* argv[]) {
   if (!init_opengl()) {
     fprintf(stderr, "Unable to initialize glad/opengl\n");
     return 1;
-  }  
-
-  std::vector<Attribute> attributes = {
-    { GL_UNSIGNED_INT, sizeof(GLuint), 2, true }
-  };
+  }
 
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
 
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBindVertexArray(VAO);
-  for (unsigned int i = 0; i < attributes.size(); ++i) {
-    glEnableVertexAttribArray(i);
-  }
-  unsigned int offset = 0;
-  int i = 0;
-  for (auto attr : attributes) {
-    if (attr.int_type) {
-      glVertexAttribIPointer(i, attr.length, attr.type, sizeof(Vertex), (void*)offset);
-    }
-    else {
-      glVertexAttribPointer(i, attr.length, attr.type, false, sizeof(Vertex), (void*)offset);
-    }
-    offset += attr.type_size * attr.length;
-    i++;
-  }
+  glEnableVertexAttribArray(0);
+  glVertexAttribIPointer(0, sizeof(uint32_t), GL_UNSIGNED_INT, sizeof(uint32_t), (void*)0);
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
   create_chunk();
 
   shader = new Shader("main", "main");
-  skyboxShader = new Shader("skybox", "skybox");
   camera = new Camera(glm::vec3(31, 65, -5));
   camera->handleResolution(1280, 720);
-
-  Skybox skybox;
 
   srand(time(NULL));
 
@@ -278,12 +249,6 @@ int main(int argc, char* argv[]) {
     else rightMove = 0.0f;
     auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
     camera->position += noclipSpeed * wishdir * deltaTime;
-
-    skyboxShader->use();
-    skyboxShader->setMat4("u_projection", camera->projection);
-    skyboxShader->setMat4("u_view", camera->getViewMatrix());
-    auto skybox_viewmatrix = glm::mat4(glm::mat3(camera->getViewMatrix()));
-    skybox.render(*skyboxShader, skybox_viewmatrix);
 
     if (vertexCount > 0) {
       shader->use();
