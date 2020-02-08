@@ -27,10 +27,62 @@ inline const int get_axis_i(const int &axis, const int &a, const int &b, const i
   else return c + (b * CS_P) + (a * CS_P2);
 }
 
-inline const void insert_quad(std::vector<uint32_t>* vertices, uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t light, uint32_t norm) {
+inline const bool compare_ao(std::vector<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
+  // Forward
+  if (voxels.at(get_axis_i(axis, right, forward - 1, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset, forward + forward_offset - 1, c)) > 0) return false;
+
+  // Back
+  if (voxels.at(get_axis_i(axis, right, forward + 1, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset, forward + forward_offset + 1, c)) > 0) return false;
+
+  // Left
+  if (voxels.at(get_axis_i(axis, right - 1, forward, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset - 1, forward + forward_offset, c)) > 0) return false;
+
+  // Right
+  if (voxels.at(get_axis_i(axis, right + 1, forward, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset + 1, forward + forward_offset, c)) > 0) return false;
+
+  // Left-forward
+  if (voxels.at(get_axis_i(axis, right - 1, forward - 1, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset - 1, forward + forward_offset - 1, c)) > 0) return false;
+
+  // Left-back
+  if (voxels.at(get_axis_i(axis, right - 1, forward + 1, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset - 1, forward + forward_offset + 1, c)) > 0) return false;
+
+  // Right-forward
+  if (voxels.at(get_axis_i(axis, right + 1, forward - 1, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset + 1, forward + forward_offset - 1, c)) > 0) return false;
+
+  // Right-back
+  if (voxels.at(get_axis_i(axis, right + 1, forward + 1, c)) > 0 !=
+      voxels.at(get_axis_i(axis, right + right_offset + 1, forward + forward_offset + 1, c)) > 0) return false;
+
+  return true;
+}
+
+inline const bool compare_forward(std::vector<uint8_t>& voxels, std::vector<uint8_t>& light_map, int axis, int forward, int right, int bit_pos, int light_dir) {
+  return
+    voxels.at(get_axis_i(axis, right, forward, bit_pos)) == voxels.at(get_axis_i(axis, right, forward + 1, bit_pos)) &&
+    light_map.at(get_axis_i(axis, right, forward, bit_pos + light_dir)) == light_map.at(get_axis_i(axis, right, forward + 1, bit_pos + light_dir)) &&
+    compare_ao(voxels, axis, forward, right, bit_pos + light_dir, 1, 0)
+  ;
+}
+
+inline const bool compare_right(std::vector<uint8_t>& voxels, std::vector<uint8_t>& light_map, int axis, int forward, int right, int bit_pos, int light_dir) {
+  return
+    voxels.at(get_axis_i(axis, right, forward, bit_pos)) == voxels.at(get_axis_i(axis, right + 1, forward, bit_pos)) &&
+    light_map.at(get_axis_i(axis, right, forward, bit_pos + light_dir)) == light_map.at(get_axis_i(axis, right + 1, forward, bit_pos + light_dir)) &&
+    compare_ao(voxels, axis, forward, right, bit_pos + light_dir, 0, 1)
+  ;
+}
+
+inline const void insert_quad(std::vector<uint32_t>* vertices, uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t light, uint32_t norm, uint32_t ao) {
   vertices->insert(vertices->end(),
     {
-      (norm << 27) | (light << 23) | (type << 18) | (z << 12) | (y << 6) | x
+      (ao << 30) | (norm << 27) | (light << 23) | (type << 18) | (z << 12) | (y << 6) | x
     }
    );
 }
@@ -73,7 +125,9 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
 
   // Step 3: Greedy meshing
   for (int face = 0; face < 6; face++) {
+    int axis = face / 2;
     int light_dir = face % 2 == 0 ? 1 : -1;
+
     int merged_forward[CS_P2] = { 0 };
     for (int forward = 1; forward < CS_P - 1; forward++) {
       uint64_t bits_walking_right = 0;
@@ -90,12 +144,9 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
           int bit_pos = CTZ(copy_front);
           copy_front &= ~(1ULL << bit_pos);
 
-          if (
-            voxels.at(get_axis_i(face / 2, right, forward, bit_pos)) ==
-            voxels.at(get_axis_i(face / 2, right, forward + 1, bit_pos)) &&
-            light_map.at(get_axis_i(face / 2, right, forward, bit_pos + light_dir)) ==
-            light_map.at(get_axis_i(face / 2, right, forward + 1, bit_pos + light_dir))
-            ) {
+          if (bit_pos == 0 || bit_pos == CS_P - 1) continue;
+
+          if (compare_forward(voxels, light_map, axis, forward, right, bit_pos, light_dir)) {
             merged_forward[(right * CS_P) + bit_pos]++;
           }
           else {
@@ -114,11 +165,8 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
           if (
             (bits_merging_right & (1ULL << bit_pos)) != 0 &&
             merged_forward[(right * CS_P) + bit_pos] == merged_forward[(right + 1) * CS_P + bit_pos] &&
-            voxels.at(get_axis_i(face / 2, right, forward, bit_pos)) ==
-            voxels.at(get_axis_i(face / 2, right + 1, forward, bit_pos)) &&
-            light_map.at(get_axis_i(face / 2, right, forward, bit_pos + light_dir)) ==
-            light_map.at(get_axis_i(face / 2, right + 1, forward, bit_pos + light_dir))
-            ) {
+            compare_right(voxels, light_map, axis, forward, right, bit_pos, light_dir)
+          ) {
             bits_walking_right |= 1ULL << bit_pos;
             merged_right[bit_pos]++;
             merged_forward[(right * CS_P) + bit_pos] = 0;
@@ -132,59 +180,75 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
           uint8_t mesh_back = forward + 1;
           uint8_t mesh_up = bit_pos + (face % 2 == 0 ? 1 : 0);
 
-          uint8_t type = voxels.at(get_axis_i(face / 2, right, forward, bit_pos));
-          uint8_t light = light_map.at(get_axis_i(face / 2, right, forward, bit_pos + light_dir));
+          uint8_t type = voxels.at(get_axis_i(axis, right, forward, bit_pos));
+          uint8_t light = light_map.at(get_axis_i(axis, right, forward, bit_pos + light_dir));
+
+          int c = bit_pos + light_dir;
+          uint8_t ao_F = (voxels.at(get_axis_i(axis, right, forward - 1, c)) > 0) ? 1 : 0;
+          uint8_t ao_B = (voxels.at(get_axis_i(axis, right, forward + 1, c)) > 0) ? 1 : 0;
+          uint8_t ao_L = (voxels.at(get_axis_i(axis, right - 1, forward, c)) > 0) ? 1 : 0;
+          uint8_t ao_R = (voxels.at(get_axis_i(axis, right + 1, forward, c)) > 0) ? 1 : 0;
+
+          uint8_t ao_LFC = (voxels.at(get_axis_i(axis, right - 1, forward - 1, c)) > 0) ? 1 : 0;
+          uint8_t ao_LBC = (voxels.at(get_axis_i(axis, right - 1, forward + 1, c)) > 0) ? 1 : 0;
+          uint8_t ao_RFC = (voxels.at(get_axis_i(axis, right + 1, forward - 1, c)) > 0) ? 1 : 0;
+          uint8_t ao_RBC = (voxels.at(get_axis_i(axis, right + 1, forward + 1, c)) > 0) ? 1 : 0;
+
+          uint8_t ao_LB = ao_L + ao_B + ao_LBC;
+          uint8_t ao_LF = ao_L + ao_F + ao_LFC;
+          uint8_t ao_RB = ao_R + ao_B + ao_RBC;
+          uint8_t ao_RF = ao_R + ao_F + ao_RFC;
 
           merged_forward[(right * CS_P) + bit_pos] = 0;
           merged_right[bit_pos] = 0;
 
           if (face == 0) {
-            insert_quad(vertices, mesh_left, mesh_up, mesh_front, type, light, face);
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_back, type, light, face);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_back, type, light, face);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_back, type, light, face);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face);
-            insert_quad(vertices, mesh_left, mesh_up, mesh_front, type, light, face);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face, ao_LF);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_back,  type, light, face, ao_LB);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_back,  type, light, face, ao_RB);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_back,  type, light, face, ao_RB);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face, ao_LF);
           }
           else if (face == 1) {
-            insert_quad(vertices, mesh_left, mesh_up, mesh_back, type, light, face);
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_back, type, light, face);
-            insert_quad(vertices, mesh_left, mesh_up, mesh_back, type, light, face);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_back,  type, light, face, ao_LB);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face, ao_LF);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_right, mesh_up, mesh_back,  type, light, face, ao_RB);
+            insert_quad(vertices, mesh_left,  mesh_up, mesh_back,  type, light, face, ao_LB);
           }
           else if (face == 2) {
-            insert_quad(vertices, mesh_up, mesh_front, mesh_left, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_back, mesh_left, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_back, mesh_right, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_back, mesh_right, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_left, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_left,  type, light, face, ao_LF);
+            insert_quad(vertices, mesh_up, mesh_back,  mesh_left,  type, light, face, ao_LB);
+            insert_quad(vertices, mesh_up, mesh_back,  mesh_right, type, light, face, ao_RB);
+            insert_quad(vertices, mesh_up, mesh_back,  mesh_right, type, light, face, ao_RB);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_left,  type, light, face, ao_LF);
           }
           else if (face == 3) {
-            insert_quad(vertices, mesh_up, mesh_back, mesh_left, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_left, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_back, mesh_right, type, light, face);
-            insert_quad(vertices, mesh_up, mesh_back, mesh_left, type, light, face);
+            insert_quad(vertices, mesh_up, mesh_back,  mesh_left,  type, light, face, ao_LB);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_left,  type, light, face, ao_LF);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_up, mesh_back,  mesh_right, type, light, face, ao_RB);
+            insert_quad(vertices, mesh_up, mesh_back,  mesh_left,  type, light, face, ao_LB);
           }
           else if (face == 4) {
-            insert_quad(vertices, mesh_front, mesh_left, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_back, mesh_left, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_back, mesh_right, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_back, mesh_right, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_front,mesh_right,mesh_up, type, light, face);
-            insert_quad(vertices, mesh_front, mesh_left, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_front, mesh_left,  mesh_up, type, light, face, ao_LF);
+            insert_quad(vertices, mesh_back,  mesh_left,  mesh_up, type, light, face, ao_LB);
+            insert_quad(vertices, mesh_back,  mesh_right, mesh_up, type, light, face, ao_RB);
+            insert_quad(vertices, mesh_back,  mesh_right, mesh_up, type, light, face, ao_RB);
+            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_front, mesh_left,  mesh_up, type, light, face, ao_LF);
           }
           else if (face == 5) {
-            insert_quad(vertices, mesh_back, mesh_left, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_front, mesh_left, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_back, mesh_right, mesh_up, type, light, face);
-            insert_quad(vertices, mesh_back, mesh_left, mesh_up, type, light, face);
+            insert_quad(vertices, mesh_back,  mesh_left,  mesh_up, type, light, face, ao_LB);
+            insert_quad(vertices, mesh_front, mesh_left,  mesh_up, type, light, face, ao_LF);
+            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
+            insert_quad(vertices, mesh_back,  mesh_right, mesh_up, type, light, face, ao_RB);
+            insert_quad(vertices, mesh_back,  mesh_left,  mesh_up, type, light, face, ao_LB);
           }
         }
       }

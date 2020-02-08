@@ -5,8 +5,9 @@ uniform mat4 u_view;
 uniform mat4 u_projection;
 
 out vec4 frag_viewspace;
-out vec3 frag_normal;
 out vec3 frag_pos;
+out vec3 frag_normal;
+out float frag_ao;
 flat out float frag_light;
 flat out uint frag_type;
 
@@ -26,7 +27,8 @@ void main() {
   uint type  = (data >> 18)&31;
   uint light = (data >> 23)&15;
   uint norm  = (data >> 27)&7;
-  // 2 bit left for ao
+  uint ao = (data >> 30)&3;
+  frag_ao = clamp(1.0 - (float(ao) / 3.0), 0.7, 1.0);
 
   frag_pos = vec3(x, y, z) - vec3(0.5);
   frag_viewspace = u_view * vec4(frag_pos, 1);
@@ -35,4 +37,4 @@ void main() {
   frag_type = type;
   
   gl_Position = u_projection * frag_viewspace;
-}
+} 

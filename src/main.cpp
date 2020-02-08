@@ -129,6 +129,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
   }
 
+  else if (key == GLFW_KEY_1 && action == GLFW_RELEASE) {
+    printf("Forward: %.1f, %.1f, %.1f \n", camera->front.x, camera->front.y, camera->front.z);
+  }
+
   else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
     create_chunk();
   }
