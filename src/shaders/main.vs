@@ -28,7 +28,7 @@ void main() {
   uint light = (data >> 23)&15;
   uint norm  = (data >> 27)&7;
   uint ao = (data >> 30)&3;
-  frag_ao = clamp(1.0 - (float(ao) / 3.0), 0.7, 1.0);
+  frag_ao = clamp(1.0 - (float(ao) / 3.0), 0.5, 1.0);
 
   frag_pos = vec3(x, y, z) - vec3(0.5);
   frag_viewspace = u_view * vec4(frag_pos, 1);

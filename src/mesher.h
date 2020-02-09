@@ -8,11 +8,6 @@
 #include "timer.h"
 #include "constants.h"
 
-struct Mesh {
-  std::vector<uint32_t>* vertices;
-  std::vector<uint32_t>* indices;
-};
-
 // MSVC specific ctz
 // Use __builtin_ctzll for gcc
 inline const int CTZ(uint64_t &x) {
@@ -27,39 +22,30 @@ inline const int get_axis_i(const int &axis, const int &a, const int &b, const i
   else return c + (b * CS_P) + (a * CS_P2);
 }
 
+// Add checks to this function to skip culling against grass for example
+inline const bool solid_check(int voxel) {
+  return voxel > 0;
+}
+
+inline constexpr glm::ivec2 ao_dirs[8] = {
+   glm::ivec2(0, -1),
+   glm::ivec2(0, 1),
+   glm::ivec2(-1, 0),
+   glm::ivec2(1, 0),
+   glm::ivec2(-1, -1),
+   glm::ivec2(-1, 1),
+   glm::ivec2(1, -1),
+   glm::ivec2(1, 1),
+};
+
 inline const bool compare_ao(std::vector<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
-  // Forward
-  if (voxels.at(get_axis_i(axis, right, forward - 1, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset, forward + forward_offset - 1, c)) > 0) return false;
-
-  // Back
-  if (voxels.at(get_axis_i(axis, right, forward + 1, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset, forward + forward_offset + 1, c)) > 0) return false;
-
-  // Left
-  if (voxels.at(get_axis_i(axis, right - 1, forward, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset - 1, forward + forward_offset, c)) > 0) return false;
-
-  // Right
-  if (voxels.at(get_axis_i(axis, right + 1, forward, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset + 1, forward + forward_offset, c)) > 0) return false;
-
-  // Left-forward
-  if (voxels.at(get_axis_i(axis, right - 1, forward - 1, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset - 1, forward + forward_offset - 1, c)) > 0) return false;
-
-  // Left-back
-  if (voxels.at(get_axis_i(axis, right - 1, forward + 1, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset - 1, forward + forward_offset + 1, c)) > 0) return false;
-
-  // Right-forward
-  if (voxels.at(get_axis_i(axis, right + 1, forward - 1, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset + 1, forward + forward_offset - 1, c)) > 0) return false;
-
-  // Right-back
-  if (voxels.at(get_axis_i(axis, right + 1, forward + 1, c)) > 0 !=
-      voxels.at(get_axis_i(axis, right + right_offset + 1, forward + forward_offset + 1, c)) > 0) return false;
-
+  for (const auto& ao_dir : ao_dirs) {
+    if (solid_check(voxels.at(get_axis_i(axis, right + ao_dir[0], forward + ao_dir[1], c))) !=
+        solid_check(voxels.at(get_axis_i(axis, right + right_offset + ao_dir[0], forward + forward_offset + ao_dir[1], c)))
+    ) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -103,7 +89,7 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
     for (int x = 0; x < CS_P; x++) {
       uint64_t zb = 0;
       for (int z = 0; z < CS_P; z++) {
-        if (*p > 0) {
+        if (solid_check(*p)) {
           axis_cols[x + (z * CS_P)] |= 1ULL << y;
           axis_cols[z + (y * CS_P) + (CS_P2)] |= 1ULL << x;
           zb |= 1ULL << z;
@@ -184,15 +170,15 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
           uint8_t light = light_map.at(get_axis_i(axis, right, forward, bit_pos + light_dir));
 
           int c = bit_pos + light_dir;
-          uint8_t ao_F = (voxels.at(get_axis_i(axis, right, forward - 1, c)) > 0) ? 1 : 0;
-          uint8_t ao_B = (voxels.at(get_axis_i(axis, right, forward + 1, c)) > 0) ? 1 : 0;
-          uint8_t ao_L = (voxels.at(get_axis_i(axis, right - 1, forward, c)) > 0) ? 1 : 0;
-          uint8_t ao_R = (voxels.at(get_axis_i(axis, right + 1, forward, c)) > 0) ? 1 : 0;
+          uint8_t ao_F = solid_check(voxels.at(get_axis_i(axis, right, forward - 1, c))) ? 1 : 0;
+          uint8_t ao_B = solid_check(voxels.at(get_axis_i(axis, right, forward + 1, c))) ? 1 : 0;
+          uint8_t ao_L = solid_check(voxels.at(get_axis_i(axis, right - 1, forward, c))) ? 1 : 0;
+          uint8_t ao_R = solid_check(voxels.at(get_axis_i(axis, right + 1, forward, c))) ? 1 : 0;
 
-          uint8_t ao_LFC = (voxels.at(get_axis_i(axis, right - 1, forward - 1, c)) > 0) ? 1 : 0;
-          uint8_t ao_LBC = (voxels.at(get_axis_i(axis, right - 1, forward + 1, c)) > 0) ? 1 : 0;
-          uint8_t ao_RFC = (voxels.at(get_axis_i(axis, right + 1, forward - 1, c)) > 0) ? 1 : 0;
-          uint8_t ao_RBC = (voxels.at(get_axis_i(axis, right + 1, forward + 1, c)) > 0) ? 1 : 0;
+          uint8_t ao_LFC = solid_check(voxels.at(get_axis_i(axis, right - 1, forward - 1, c))) ? 1 : 0;
+          uint8_t ao_LBC = solid_check(voxels.at(get_axis_i(axis, right - 1, forward + 1, c))) ? 1 : 0;
+          uint8_t ao_RFC = solid_check(voxels.at(get_axis_i(axis, right + 1, forward - 1, c))) ? 1 : 0;
+          uint8_t ao_RBC = solid_check(voxels.at(get_axis_i(axis, right + 1, forward + 1, c))) ? 1 : 0;
 
           uint8_t ao_LB = ao_L + ao_B + ao_LBC;
           uint8_t ao_LF = ao_L + ao_F + ao_LFC;
