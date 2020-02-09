@@ -38,6 +38,13 @@ inline constexpr glm::ivec2 ao_dirs[8] = {
    glm::ivec2(1, 1),
 };
 
+inline const int vertexAO(int side1, int side2, int corner) {
+  if (side1 && side2) {
+    return 0;
+  }
+  return 3 - (side1 + side2 + corner);
+}
+
 inline const bool compare_ao(std::vector<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
   for (const auto& ao_dir : ao_dirs) {
     if (solid_check(voxels.at(get_axis_i(axis, right + ao_dir[0], forward + ao_dir[1], c))) !=
@@ -65,12 +72,17 @@ inline const bool compare_right(std::vector<uint8_t>& voxels, std::vector<uint8_
   ;
 }
 
-inline const void insert_quad(std::vector<uint32_t>* vertices, uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t light, uint32_t norm, uint32_t ao) {
-  vertices->insert(vertices->end(),
-    {
-      (ao << 30) | (norm << 27) | (light << 23) | (type << 18) | (z << 12) | (y << 6) | x
-    }
-   );
+inline const void insert_quad(std::vector<uint32_t>* vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped) {
+  if (flipped) {
+    vertices->insert(vertices->end(), { v1, v2, v4, v4, v2, v3 });
+  }
+  else {
+    vertices->insert(vertices->end(), { v1, v2, v3, v3, v4, v1 });
+  }
+}
+
+inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t light, uint32_t norm, uint32_t ao) {
+  return (ao << 30) | (norm << 27) | (light << 23) | (type << 18) | ((z - 1) << 12) | ((y - 1) << 6) | (x - 1);
 }
 
 // voxels - 64^3 (includes neighboring voxels)
@@ -180,61 +192,57 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
           uint8_t ao_RFC = solid_check(voxels.at(get_axis_i(axis, right + 1, forward - 1, c))) ? 1 : 0;
           uint8_t ao_RBC = solid_check(voxels.at(get_axis_i(axis, right + 1, forward + 1, c))) ? 1 : 0;
 
-          uint8_t ao_LB = ao_L + ao_B + ao_LBC;
-          uint8_t ao_LF = ao_L + ao_F + ao_LFC;
-          uint8_t ao_RB = ao_R + ao_B + ao_RBC;
-          uint8_t ao_RF = ao_R + ao_F + ao_RFC;
+          uint8_t ao_LB = vertexAO(ao_L, ao_B, ao_LBC);
+          uint8_t ao_LF = vertexAO(ao_L, ao_F, ao_LFC);
+          uint8_t ao_RB = vertexAO(ao_R, ao_B, ao_RBC);
+          uint8_t ao_RF = vertexAO(ao_R, ao_F, ao_RFC);
 
           merged_forward[(right * CS_P) + bit_pos] = 0;
           merged_right[bit_pos] = 0;
 
+          uint32_t v1, v2, v3, v4;
           if (face == 0) {
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face, ao_LF);
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_back,  type, light, face, ao_LB);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_back,  type, light, face, ao_RB);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_back,  type, light, face, ao_RB);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face, ao_LF);
+            v1 = get_vertex(mesh_left, mesh_up, mesh_front, type, light, face, ao_LF);
+            v2 = get_vertex(mesh_left, mesh_up, mesh_back, type, light, face, ao_LB);
+            v3 = get_vertex(mesh_right, mesh_up, mesh_back, type, light, face, ao_RB);
+            v4 = get_vertex(mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
           }
           else if (face == 1) {
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_back,  type, light, face, ao_LB);
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_front, type, light, face, ao_LF);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_right, mesh_up, mesh_back,  type, light, face, ao_RB);
-            insert_quad(vertices, mesh_left,  mesh_up, mesh_back,  type, light, face, ao_LB);
+            v1 = get_vertex(mesh_left, mesh_up, mesh_back, type, light, face, ao_LB);
+            v2 = get_vertex(mesh_left, mesh_up, mesh_front, type, light, face, ao_LF);
+            v3 = get_vertex(mesh_right, mesh_up, mesh_front, type, light, face, ao_RF);
+            v4 = get_vertex(mesh_right, mesh_up, mesh_back, type, light, face, ao_RB);
           }
           else if (face == 2) {
-            insert_quad(vertices, mesh_up, mesh_front, mesh_left,  type, light, face, ao_LF);
-            insert_quad(vertices, mesh_up, mesh_back,  mesh_left,  type, light, face, ao_LB);
-            insert_quad(vertices, mesh_up, mesh_back,  mesh_right, type, light, face, ao_RB);
-            insert_quad(vertices, mesh_up, mesh_back,  mesh_right, type, light, face, ao_RB);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_left,  type, light, face, ao_LF);
+            v1 = get_vertex(mesh_up, mesh_front, mesh_left, type, light, face, ao_LF);
+            v2 = get_vertex(mesh_up, mesh_back, mesh_left, type, light, face, ao_LB);
+            v3 = get_vertex(mesh_up, mesh_back, mesh_right, type, light, face, ao_RB);
+            v4 = get_vertex(mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
           }
           else if (face == 3) {
-            insert_quad(vertices, mesh_up, mesh_back,  mesh_left,  type, light, face, ao_LB);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_left,  type, light, face, ao_LF);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_up, mesh_back,  mesh_right, type, light, face, ao_RB);
-            insert_quad(vertices, mesh_up, mesh_back,  mesh_left,  type, light, face, ao_LB);
+            v1 = get_vertex(mesh_up, mesh_back, mesh_left, type, light, face, ao_LB);
+            v2 = get_vertex(mesh_up, mesh_front, mesh_left, type, light, face, ao_LF);
+            v3 = get_vertex(mesh_up, mesh_front, mesh_right, type, light, face, ao_RF);
+            v4 = get_vertex(mesh_up, mesh_back, mesh_right, type, light, face, ao_RB);
           }
           else if (face == 4) {
-            insert_quad(vertices, mesh_front, mesh_left,  mesh_up, type, light, face, ao_LF);
-            insert_quad(vertices, mesh_back,  mesh_left,  mesh_up, type, light, face, ao_LB);
-            insert_quad(vertices, mesh_back,  mesh_right, mesh_up, type, light, face, ao_RB);
-            insert_quad(vertices, mesh_back,  mesh_right, mesh_up, type, light, face, ao_RB);
-            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_front, mesh_left,  mesh_up, type, light, face, ao_LF);
+            v1 = get_vertex(mesh_front, mesh_left, mesh_up, type, light, face, ao_LF);
+            v2 = get_vertex(mesh_back, mesh_left, mesh_up, type, light, face, ao_LB);
+            v3 = get_vertex(mesh_back, mesh_right, mesh_up, type, light, face, ao_RB);
+            v4 = get_vertex(mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
           }
           else if (face == 5) {
-            insert_quad(vertices, mesh_back,  mesh_left,  mesh_up, type, light, face, ao_LB);
-            insert_quad(vertices, mesh_front, mesh_left,  mesh_up, type, light, face, ao_LF);
-            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
-            insert_quad(vertices, mesh_back,  mesh_right, mesh_up, type, light, face, ao_RB);
-            insert_quad(vertices, mesh_back,  mesh_left,  mesh_up, type, light, face, ao_LB);
+            v1 = get_vertex(mesh_back, mesh_left, mesh_up, type, light, face, ao_LB);
+            v2 = get_vertex(mesh_front, mesh_left, mesh_up, type, light, face, ao_LF);
+            v3 = get_vertex(mesh_front, mesh_right, mesh_up, type, light, face, ao_RF);
+            v4 = get_vertex(mesh_back, mesh_right, mesh_up, type, light, face, ao_RB);
+          }
+
+          if (ao_LB + ao_RF > ao_RB + ao_LF) {
+            insert_quad(vertices, v1, v2, v3, v4, true);
+          }
+          else {
+            insert_quad(vertices, v1, v2, v3, v4, false);
           }
         }
       }
