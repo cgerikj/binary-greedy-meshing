@@ -14,17 +14,19 @@ const vec3 diffuse_color = vec3(0.15, 0.15, 0.15);
 const vec3 rim_color = vec3(0.04, 0.04, 0.04);
 const vec3 sun_position = vec3(250.0, 1000.0, 750.0);
 
+vec3 get_color(uint frag_type) {
+  switch (frag_type) {
+    case 1: return vec3(0.6, 0.1, 0.1);
+    case 2: return vec3(0.1, 0.6, 0.1);
+    case 3: return vec3(0.1, 0.1, 0.6);
+    case 4: return vec3(0.1, 0.6, 0.6);
+    case 5: return vec3(0.6, 0.1, 0.6);
+    case 6: return vec3(0.6, 0.6, 0.1);
+  }
+}
+
 void main() {
-  vec3 final_color;
-  if (frag_type == 1) {
-   final_color = vec3(0.6, 0.1, 0.1);
-  }
-  else if (frag_type == 2) {
-   final_color = vec3(0.1, 0.6, 0.1);
-  }
-  else {
-   final_color = vec3(0.1, 0.1, 0.6);
-  }
+  vec3 final_color = get_color(frag_type);
 
   vec3 L = normalize(sun_position - frag_pos);
   vec3 V = normalize(eye_position - frag_pos);

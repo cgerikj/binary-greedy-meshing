@@ -11,6 +11,7 @@
 #include "camera.h"
 #include "noise.h"
 #include "light.h"
+#include "utility.h"
 
 void create_chunk();
 
@@ -102,6 +103,9 @@ float last_y = 0.0f;
 enum class MESH_TYPE: int {
   TERRAIN,
   RANDOM,
+  CHECKERBOARD,
+  SPHERE,
+  EMPTY,
   Count
 };
 
@@ -161,6 +165,40 @@ void create_chunk() {
 
     case (int)MESH_TYPE::RANDOM: {
       noise.generateWhiteNoiseTerrain(voxels, std::rand());
+      break;
+    }
+
+    case (int)MESH_TYPE::CHECKERBOARD: {
+      for (int x = 1; x < CS_P; x++) {
+        for (int y = 1; y < CS_P; y++) {
+          for (int z = 1; z < CS_P; z++) {
+            if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
+              voxels.at(get_yzx_index(x, y, z)) = 1;
+              voxels.at(get_yzx_index(x - 1, y - 1, z)) = 2;
+              voxels.at(get_yzx_index(x - 1, y, z - 1)) = 3;
+              voxels.at(get_yzx_index(x, y - 1, z - 1)) = 4;
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case (int)MESH_TYPE::SPHERE: {
+      int r = CS_P / 2;
+      for (int x = -r; x < r; x++) {
+        for (int y = -r; y < r; y++) {
+          for (int z = -r; z < r; z++) {
+            if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
+              voxels.at(get_yzx_index(x+r, y+r, z+r)) = 1;
+            }
+          }
+        }
+      }
+    }
+
+    case (int)MESH_TYPE::EMPTY: {
+      // empty!
       break;
     }
   }
