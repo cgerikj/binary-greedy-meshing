@@ -32,13 +32,17 @@ SOFTWARE.
 #include "timer.h"
 #include "constants.h"
 
-// MSVC specific ctz
-// Use __builtin_ctzll for gcc
+#ifdef _MSC_VER
 inline const int CTZ(uint64_t &x) {
   unsigned long index;
   _BitScanForward64(&index, x);
   return (int)index;
 }
+#else
+inline const int CTZ(uint64_t x) {
+  return __builtin_ctzll(x);
+}
+#endif
 
 inline const int get_axis_i(const int &axis, const int &a, const int &b, const int &c) {
   if (axis == 0) return b + (a * CS_P) + (c * CS_P2);

@@ -14,3 +14,6 @@ libraries/*
 !libraries/glad
 RelWithDebInfo
 resources
+Makefile
+*.a
+*.exe
