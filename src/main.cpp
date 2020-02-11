@@ -195,6 +195,7 @@ void create_chunk() {
           }
         }
       }
+      break;
     }
 
     case (int)MESH_TYPE::EMPTY: {

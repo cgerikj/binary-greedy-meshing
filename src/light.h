@@ -14,7 +14,6 @@ void calculate_light(std::vector<uint8_t>& voxels, std::vector<uint8_t>& light_m
         }
         else {
           auto light_above = light_map.at(i + CS_P2);
-          auto voxel = voxels.at(i);
           if (voxels.at(i) == 0 && light_above > 0) {
             light_map.at(i) = light_above;
           }
