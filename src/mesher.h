@@ -144,7 +144,7 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, std::vector<uint8_t>& 
   for (int axis = 0; axis <= 2; axis++) {
     for (int i = 0; i < CS_P2; i++) {
       uint64_t col = axis_cols[(CS_P2 * axis) + i];
-      col_face_masks[(CS_P2 * (axis * 2)) + i] = col & ~((col >> 1) | (1ULL << CS_P - 1));
+      col_face_masks[(CS_P2 * (axis * 2)) + i] = col & ~((col >> 1) | (1ULL << (CS_P - 1)));
       col_face_masks[(CS_P2 * (axis * 2 + 1)) + i] = col & ~((col << 1) | 1ULL);
     }
   }
