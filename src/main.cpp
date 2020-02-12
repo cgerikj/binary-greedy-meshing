@@ -68,7 +68,7 @@ void GLAPIENTRY message_callback(
   }
   fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = %s, message = %s\n",
     type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "",
-    type, SEVERITY, message);
+    type, SEVERITY.c_str(), message);
 }
 
 bool init_opengl() {
