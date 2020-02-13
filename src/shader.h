@@ -17,7 +17,7 @@ public:
 
   Shader(std::string vertex_name, std::string fragment_name): vertex_name(vertex_name), fragment_name(fragment_name) {
     std::string vShaderCode;
-    std::fstream vertexFile("src/shaders/" + vertex_name + ".vs", std::ios::in);
+    std::fstream vertexFile("../src/shaders/" + vertex_name + ".vs", std::ios::in);
     if (vertexFile.is_open()) {
       std::stringstream buffer;
       buffer << vertexFile.rdbuf();
@@ -34,7 +34,7 @@ public:
 
 
     std::string fShaderCode;
-    std::fstream fragmentFile("src/shaders/" + fragment_name + ".fs", std::ios::in);
+    std::fstream fragmentFile("../src/shaders/" + fragment_name + ".fs", std::ios::in);
     if (fragmentFile.is_open()) {
       std::stringstream buffer;
       buffer << fragmentFile.rdbuf();

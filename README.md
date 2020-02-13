@@ -3,14 +3,14 @@
 Fast voxel meshing algorithm - creates 'greedy' meshes with support for voxel types, baked light & Ambient Occlusion.
 UVs can easily be added but the vertex structure would have to be changed from a single integer.
 
-## Installation example (visual studio)
+## Setup example (Visual Studio)
 ```
-git clone git@github.com:cgerikj/binary-greedy-meshing.git --recursive
-cd binary-greedy-meshing
-cmake -G "Visual Studio 16 2019" .
+> git clone https://github.com/cgerikj/binary-greedy-meshing --recursive
+> cd binary-greedy-meshing
+> mkdir build && cd build
+> cmake .. -G "Visual Studio 16 2019"
+> start binaryMesher.sln
 ```
-
-Open binaryMesher.sln
 
 ## Program usage
 
