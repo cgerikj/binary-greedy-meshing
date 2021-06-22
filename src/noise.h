@@ -29,7 +29,7 @@ public:
 
             switch (voxels.at(i_above)) {
               case 0:
-                voxels.at(i) = 2;
+                voxels.at(i) = 1;
                 break;
               default:
                 voxels.at(i) = 1;
@@ -53,10 +53,10 @@ public:
             voxels.at(i) = 1;
           }
           else if (noise > 0.6f) {
-            voxels.at(i) = 2;
+            voxels.at(i) = 1;
           }
           else if (noise > 0.5f) {
-            voxels.at(i) = 3;
+            voxels.at(i) = 1;
           }
         }
       }

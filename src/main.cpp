@@ -159,6 +159,7 @@ void create_chunk() {
 
   switch (mesh_type) {
     case (int)MESH_TYPE::TERRAIN: {
+      // break;
       noise.generateTerrain(voxels, std::rand());
       break;
     }
@@ -174,9 +175,9 @@ void create_chunk() {
           for (int z = 1; z < CS_P; z++) {
             if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
               voxels.at(get_yzx_index(x, y, z)) = 1;
-              voxels.at(get_yzx_index(x - 1, y - 1, z)) = 2;
-              voxels.at(get_yzx_index(x - 1, y, z - 1)) = 3;
-              voxels.at(get_yzx_index(x, y - 1, z - 1)) = 4;
+              voxels.at(get_yzx_index(x - 1, y - 1, z)) = 1;
+              voxels.at(get_yzx_index(x - 1, y, z - 1)) = 1;
+              voxels.at(get_yzx_index(x, y - 1, z - 1)) = 1;
             }
           }
         }
@@ -189,7 +190,7 @@ void create_chunk() {
       for (int x = -r; x < r; x++) {
         for (int y = -r; y < r; y++) {
           for (int z = -r; z < r; z++) {
-            if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
+            if (std::sqrt(x * x + y * y + z * z) < (float)CS/2) {
               voxels.at(get_yzx_index(x+r, y+r, z+r)) = 1;
             }
           }
@@ -208,15 +209,29 @@ void create_chunk() {
   std::fill(light_map.begin(), light_map.end(), 0);
   calculate_light(voxels, light_map);
 
-  auto vertices = mesh(voxels, light_map);
+  //std::vector<uint16_t>* vertices;
+  auto vertices = new std::vector<uint16_t>();
+  // Reserve the number of vertices in the worst possible case 
+  vertices->reserve(4289904);
+
+  int count = 1;
+  Timer timer("meshing " + std::to_string(count) + " times", true);
+  for (int i = 0; i <count; i++) {
+    vertices->clear();
+    mesh(voxels, vertices);
+  }
+  timer.end();
+
   if (vertices == nullptr) {
     vertexCount = 0;
   } else {
     vertexCount = vertices->size();
 
+    // FIND MIN MAX TO DEBUG EDGES
+
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(uint32_t), vertices->data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(uint16_t), vertices->data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
@@ -257,7 +272,7 @@ int main(int argc, char* argv[]) {
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBindVertexArray(VAO);
   glEnableVertexAttribArray(0);
-  glVertexAttribIPointer(0, sizeof(uint32_t), GL_UNSIGNED_INT, sizeof(uint32_t), (void*)0);
+  glVertexAttribIPointer(0, sizeof(uint16_t), GL_UNSIGNED_SHORT, sizeof(uint16_t), (void*)0);
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -284,10 +299,10 @@ int main(int argc, char* argv[]) {
     lastFrame = currentFrame;
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) forwardMove = 1.0f;
-    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) forwardMove = -1.0f;
+    else if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) forwardMove = -1.0f;
     else forwardMove = 0.0f;
 
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) rightMove = 1.0f;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) rightMove = 1.0f;
     else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) rightMove = -1.0f;
     else rightMove = 0.0f;
     auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
@@ -297,7 +312,6 @@ int main(int argc, char* argv[]) {
       shader->use();
       shader->setMat4("u_projection", camera->projection);
       shader->setMat4("u_view", camera->getViewMatrix());
-      shader->setVec3("eye_position", camera->position);
       glBindVertexArray(VAO);
       glDrawArrays(GL_TRIANGLES, 0, vertexCount);
       glBindVertexArray(0);

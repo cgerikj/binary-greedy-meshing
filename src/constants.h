@@ -2,8 +2,7 @@
 #define CONSTANTS_H
 
 // CS = chunk size (max 62)
-static constexpr int CS = 62;
-static constexpr int Y_CHUNKS = 16;
+static constexpr int CS = 30;
 
 // Padded chunk size
 static constexpr int CS_P = CS + 2;
