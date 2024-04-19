@@ -8,10 +8,10 @@
 #include "misc/shader.h"
 #include "misc/camera.h"
 #include "misc/noise.h"
-#include "misc/light.h"
 #include "misc/utility.h"
 
 #include "mesher.h"
+#include "mesher_simplified_32_no_voxel_types.h"
 
 void create_chunk();
 
@@ -204,11 +204,7 @@ void create_chunk() {
     }
   }
 
-  std::vector<uint8_t> light_map(CS_P3);
-  std::fill(light_map.begin(), light_map.end(), 0);
-  calculate_light(voxels, light_map);
-
-  auto vertices = mesh(voxels, light_map);
+  auto vertices = mesh(voxels, true);
   if (vertices == nullptr) {
     vertexCount = 0;
   } else {

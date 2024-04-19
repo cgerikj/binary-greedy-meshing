@@ -5,7 +5,6 @@ in vec4 frag_viewspace;
 in vec3 frag_pos;
 in vec3 frag_normal;
 in float frag_ao;
-flat in float frag_light;
 flat in uint frag_type;
 
 uniform vec3 eye_position;
@@ -38,7 +37,7 @@ void main() {
   final_color += rim_color * vec3(rim, rim, rim);
 
   float ao = clamp(frag_ao, 0.0, 1.0);
-  final_color *= frag_light * smoothstep(0.0, 1.0, ao);
+  final_color *= smoothstep(0.0, 1.0, ao);
 
   frag_color = vec4(final_color, 1.0);
 }

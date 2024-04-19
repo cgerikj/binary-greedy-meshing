@@ -31,7 +31,6 @@ The main implementation is in src/mesher.h
 
 Input data:  
 std::vector<uint8_t> voxels (values 0-31 usable)  
-std::vector<uint8_t> light  (values 0-15 usable)
 
 * The input data includes duplicate edge data from neighboring chunks which is used for visibility culling and AO. For optimal performance, your world data should already be structured this way so that you can feed the data straight into this algorithm.
 
@@ -44,8 +43,7 @@ std::vector<uint32_t> of vertices in chunk-space.
 
 Vertex data is packed into one unsigned integer:
 - x, y, z: 6 bit each (0-63)
-- Type: 5 bit (0-31)
-- Light: 4 bit (0-15)
+- Type: 8 bit (0-255)
 - Normal: 3 bit (0-5)
 - AO: 2 bit
 
@@ -62,10 +60,11 @@ Meshes can be offset to world space using a per-draw uniform or by packing xyz i
 ## Benchmarks
 Average execution time running on Ryzen 3800x.
 
-| Scene             | Milliseconds   | Vertices   |
-| ----------------- |:--------------:|:----------:|
-| 3d hills          | 1.139          | 46798      |
-| Red sphere        | 1.108          | 71532      |
-| White noise       | 33.315         | 2142608    |
-| 3d checkerboard   | 36.832         | 4289904    |
-| Empty             | 0.174          | 0          |
+| Scene                 | Milliseconds   | Vertices   |
+| ---------------------:|:--------------:|:----------:|
+| 3d hills (AO)         | 0.774          | 41753      |
+| 3d hills (No AO)      | 0.450          | 28378      |
+| Red sphere (AO)       | 0.785          | 71532      |
+| White noise (AO)      | 13.24          | 1596720    |
+| 3d checkerboard (AO)  | 22.27          | 4289904    |
+| Empty (AO)            | 0.174          | 0          |
