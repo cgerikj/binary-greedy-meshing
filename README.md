@@ -8,6 +8,9 @@ Demo of a larger world: https://www.youtube.com/watch?v=LxfDmF0HxSg
 
 Video by youtuber Tantan that showcases his Rust port and explains part of the algorithm: https://www.youtube.com/watch?v=qnGoGq7DWMc
 
+**UPDATE: 2024-04-19:**  
+**The ambient occlusion implementation was fixed - it should look better now.**
+
 ## Setup example (Visual Studio)
 ```
 > git clone https://github.com/cgerikj/binary-greedy-meshing --recursive
