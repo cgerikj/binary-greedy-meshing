@@ -29,7 +29,7 @@ SOFTWARE.
 #include <glm/glm.hpp>
 #include <vector>
 #include <stdint.h>
-#include "timer.h"
+#include "misc/timer.h"
 #include "constants.h"
 
 #ifdef _MSC_VER

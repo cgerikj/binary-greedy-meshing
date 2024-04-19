@@ -1,7 +1,12 @@
 # Binary Greedy Meshing
 
-Fast voxel meshing algorithm - creates 'greedy' meshes with support for voxel types, baked light & Ambient Occlusion.
-UVs can easily be added but the vertex structure would have to be changed from a single integer.
+Fast voxel meshing algorithm that creates 'greedy' meshes using extremely fast bitwise operations. Supports voxel types and bakes ambient occlusion.
+
+This repository serves as a simple example project for the algorithm.
+
+Demo of a larger world: https://www.youtube.com/watch?v=LxfDmF0HxSg
+
+Video by youtuber Tantan that showcases his Rust port and explains part of the algorithm: https://www.youtube.com/watch?v=qnGoGq7DWMc
 
 ## Setup example (Visual Studio)
 ```
@@ -12,7 +17,7 @@ UVs can easily be added but the vertex structure would have to be changed from a
 > start binaryMesher.sln
 ```
 
-## Program usage
+## Demo usage
 
 - Noclip: WASD
 - Toggle wireframe: X
@@ -22,17 +27,18 @@ UVs can easily be added but the vertex structure would have to be changed from a
 Meshing duration is printed to the console.
 
 ## Algorithm usage
-The mesher lives in src/mesher.h
+The main implementation is in src/mesher.h
 
-Input data:
-- std::vector<uint8_t> voxels (values 0-31 usable)
-- std::vector<uint8_t> light  (values 0-15 usable)
+Input data:  
+std::vector<uint8_t> voxels (values 0-31 usable)  
+std::vector<uint8_t> light  (values 0-15 usable)
 
-The input data includes duplicate edge data from neighboring chunks which is used for visibility culling and AO.
-Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh.
+* The input data includes duplicate edge data from neighboring chunks which is used for visibility culling and AO. For optimal performance, your world data should already be structured this way so that you can feed the data straight into this algorithm.
 
-Output data:
-- std::vector<uint32_t> of vertices in chunk-space.
+* Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh. 
+
+Output data:  
+std::vector<uint32_t> of vertices in chunk-space.
 
 ## Mesh details
 

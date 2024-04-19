@@ -5,13 +5,13 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include "misc/shader.h"
+#include "misc/camera.h"
+#include "misc/noise.h"
+#include "misc/light.h"
+#include "misc/utility.h"
 
 #include "mesher.h"
-#include "shader.h"
-#include "camera.h"
-#include "noise.h"
-#include "light.h"
-#include "utility.h"
 
 void create_chunk();
 
