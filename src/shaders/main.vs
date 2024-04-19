@@ -26,7 +26,7 @@ void main() {
   uint type  = (data >> 18)&255;
   uint norm  = (data >> 26)&7;
   uint ao = (data >> 29)&3;
-  frag_ao = clamp(float(ao) / 3.0, 0.6, 1.0);
+  frag_ao = clamp(float(ao) / 3.0, 0.5, 1.0);
 
   frag_pos = vec3(x, y, z) - vec3(0.5);
   frag_viewspace = u_view * vec4(frag_pos, 1);

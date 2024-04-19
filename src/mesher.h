@@ -100,10 +100,10 @@ inline const bool compare_right(std::vector<uint8_t>& voxels, int axis, int forw
 
 inline const void insert_quad(std::vector<uint32_t>* vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped) {
   if (flipped) {
-    vertices->insert(vertices->end(), { v1, v2, v4, v4, v2, v3 });
+    vertices->insert(vertices->end(), { v1, v2, v3, v3, v4, v1 });
   }
   else {
-    vertices->insert(vertices->end(), { v1, v2, v3, v3, v4, v1 });
+    vertices->insert(vertices->end(), { v1, v2, v4, v4, v2, v3 });
   }
 }
 
@@ -212,15 +212,15 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, bool bake_ao) {
           uint8_t ao_LB = 3, ao_RB = 3, ao_RF = 3, ao_LF = 3;
           if (bake_ao) {
             int c = bit_pos + air_dir;
-            uint8_t ao_F = solid_check(voxels[get_axis_i(axis, right, forward - 1, c)]) ? 1 : 0;
-            uint8_t ao_B = solid_check(voxels[get_axis_i(axis, right, forward + 1, c)]) ? 1 : 0;
-            uint8_t ao_L = solid_check(voxels[get_axis_i(axis, right - 1, forward, c)]) ? 1 : 0;
-            uint8_t ao_R = solid_check(voxels[get_axis_i(axis, right + 1, forward, c)]) ? 1 : 0;
+            uint8_t ao_F = solid_check(voxels[get_axis_i(axis, right, forward - 1, c)]);
+            uint8_t ao_B = solid_check(voxels[get_axis_i(axis, right, forward + 1, c)]);
+            uint8_t ao_L = solid_check(voxels[get_axis_i(axis, right - 1, forward, c)]);
+            uint8_t ao_R = solid_check(voxels[get_axis_i(axis, right + 1, forward, c)]);
 
-            uint8_t ao_LFC = solid_check(voxels[get_axis_i(axis, right - 1, forward - 1, c)]) ? 1 : 0;
-            uint8_t ao_LBC = solid_check(voxels[get_axis_i(axis, right - 1, forward + 1, c)]) ? 1 : 0;
-            uint8_t ao_RFC = solid_check(voxels[get_axis_i(axis, right + 1, forward - 1, c)]) ? 1 : 0;
-            uint8_t ao_RBC = solid_check(voxels[get_axis_i(axis, right + 1, forward + 1, c)]) ? 1 : 0;
+            uint8_t ao_LFC = !ao_L && !ao_F && solid_check(voxels[get_axis_i(axis, right - 1, forward - 1, c)]);
+            uint8_t ao_LBC = !ao_L && !ao_B && solid_check(voxels[get_axis_i(axis, right - 1, forward + 1, c)]);
+            uint8_t ao_RFC = !ao_R && !ao_F && solid_check(voxels[get_axis_i(axis, right + 1, forward - 1, c)]);
+            uint8_t ao_RBC = !ao_R && !ao_B && solid_check(voxels[get_axis_i(axis, right + 1, forward + 1, c)]);
 
             ao_LB = vertexAO(ao_L, ao_B, ao_LBC);
             ao_RB = vertexAO(ao_R, ao_B, ao_RBC);
@@ -269,12 +269,7 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, bool bake_ao) {
             v4 = get_vertex(mesh_back, mesh_right, mesh_up, type, face, ao_RB);
           }
 
-          if (ao_LB + ao_RF > ao_RB + ao_LF) {
-            insert_quad(vertices, v1, v2, v3, v4, true);
-          }
-          else {
-            insert_quad(vertices, v1, v2, v3, v4, false);
-          }
+          insert_quad(vertices, v1, v2, v3, v4, ao_LB + ao_RF > ao_RB + ao_LF);
         }
       }
     }
