@@ -98,12 +98,22 @@ inline const bool compare_right(std::vector<uint8_t>& voxels, int axis, int forw
   ;
 }
 
-inline const void insert_quad(std::vector<uint32_t>* vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped) {
+inline const void insert_quad(std::vector<uint32_t>& vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped, int vertexI) {
   if (flipped) {
-    vertices->insert(vertices->end(), { v1, v2, v3, v3, v4, v1 });
+    vertices[vertexI] = v1;
+    vertices[vertexI + 1] = v2;
+    vertices[vertexI + 2] = v3;
+    vertices[vertexI + 3] = v3;
+    vertices[vertexI + 4] = v4;
+    vertices[vertexI + 5] = v1;
   }
   else {
-    vertices->insert(vertices->end(), { v1, v2, v4, v4, v2, v3 });
+    vertices[vertexI] = v1;
+    vertices[vertexI + 1] = v2;
+    vertices[vertexI + 2] = v4;
+    vertices[vertexI + 3] = v4;
+    vertices[vertexI + 4] = v2;
+    vertices[vertexI + 5] = v3;
   }
 }
 
@@ -111,37 +121,46 @@ inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint32_t ty
   return (ao << 29) | (norm << 26) | (type << 18) | ((z - 1) << 12) | ((y - 1) << 6) | (x - 1);
 }
 
-// voxels - 64^3 (includes neighboring voxels)
-std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, bool bake_ao) {
-  Timer timer("meshing", true);
+std::vector<uint64_t>* generate_initial_axis_cols(std::vector<uint8_t>& voxels) {
+  std::vector<uint64_t>* axis_cols = new std::vector<uint64_t>(CS_P2 * 3);
 
-  uint64_t axis_cols[CS_P2 * 3] = { 0 };
-  uint64_t col_face_masks[CS_P2 * 6];
-
-  auto vertices = new std::vector<uint32_t>();
-
-  // Step 1: Convert to binary representation for each direction
   auto p = voxels.begin();
   for (int y = 0; y < CS_P; y++) {
     for (int x = 0; x < CS_P; x++) {
       uint64_t zb = 0;
       for (int z = 0; z < CS_P; z++) {
         if (solid_check(*p)) {
-          axis_cols[x + (z * CS_P)] |= 1ULL << y;
-          axis_cols[z + (y * CS_P) + (CS_P2)] |= 1ULL << x;
+          (*axis_cols)[x + (z * CS_P)] |= 1ULL << y;
+          (*axis_cols)[z + (y * CS_P) + (CS_P2)] |= 1ULL << x;
           zb |= 1ULL << z;
         }
         p++;
       }
-      axis_cols[y + (x * CS_P) + (CS_P2 * 2)] = zb;
+      (*axis_cols)[y + (x * CS_P) + (CS_P2 * 2)] = zb;
     }
   }
 
+  return axis_cols;
+}
+
+static const uint64_t CULL_MASK = (1ULL << CS_P - 1);
+
+// voxels - 64^3 (includes neighboring voxels)
+// vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
+// vertexLength - output  number of vertices to read from vertices
+void mesh(std::vector<uint8_t>& voxels, std::vector<uint32_t>& vertices, int& vertexLength, bool bake_ao) {
+  vertexLength = 0;
+  int vertexI = 0;
+
+  // NOTE: axis_cols can be pre-computed as an optimization - not doing that here to simplify the demo
+  auto axis_cols = *generate_initial_axis_cols(voxels);
+
+  uint64_t col_face_masks[CS_P2 * 6];
   // Step 2: Visible face culling
   for (int axis = 0; axis <= 2; axis++) {
-    for (int i = 0; i < CS_P2; i++) {
+    for (int i = 1; i < CS_P2 - 1; i++) {
       uint64_t col = axis_cols[(CS_P2 * axis) + i];
-      col_face_masks[(CS_P2 * (axis * 2)) + i] = col & ~((col >> 1) | (1ULL << CS_P - 1));
+      col_face_masks[(CS_P2 * (axis * 2)) + i] = col & ~((col >> 1) | CULL_MASK);
       col_face_masks[(CS_P2 * (axis * 2 + 1)) + i] = col & ~((col << 1) | 1ULL);
     }
   }
@@ -171,8 +190,11 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, bool bake_ao) {
 
           if (bit_pos < 1 || bit_pos >= CS_P - 1) continue;
 
-          if (compare_forward(voxels, axis, forward, right, bit_pos, air_dir, bake_ao)) {
-            merged_forward[(right * CS_P) + bit_pos]++;
+          if(
+            voxels[get_axis_i(axis, right, forward, bit_pos)] == voxels[get_axis_i(axis, right, forward + 1, bit_pos)] &&
+            (!bake_ao || compare_ao(voxels, axis, forward, right, bit_pos + air_dir, 1, 0))
+          ) {
+          merged_forward[(right * CS_P) + bit_pos]++;
           }
           else {
             bits_merging_forward &= ~(1ULL << bit_pos);
@@ -189,10 +211,13 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, bool bake_ao) {
             continue;
           }
 
+          uint8_t type = voxels[get_axis_i(axis, right, forward, bit_pos)];
+
           if (
             (bits_merging_right & (1ULL << bit_pos)) != 0 &&
-            merged_forward[(right * CS_P) + bit_pos] == merged_forward[(right + 1) * CS_P + bit_pos] &&
-            compare_right(voxels, axis, forward, right, bit_pos, air_dir, bake_ao)
+            (merged_forward[(right * CS_P) + bit_pos] == merged_forward[(right + 1) * CS_P + bit_pos]) &&
+            (type == voxels[get_axis_i(axis, right + 1, forward, bit_pos)]) &&
+            (!bake_ao || compare_ao(voxels, axis, forward, right, bit_pos + air_dir, 0, 1))
           ) {
             bits_walking_right |= 1ULL << bit_pos;
             merged_right[bit_pos]++;
@@ -201,13 +226,11 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, bool bake_ao) {
           }
           bits_walking_right &= ~(1ULL << bit_pos);
 
-          GLubyte mesh_left = right - merged_right[bit_pos];
-          GLubyte mesh_right = right + 1;
-          GLubyte mesh_front = forward - merged_forward[rightxCS_P + bit_pos];
-          GLubyte mesh_back = forward + 1;
-          GLubyte mesh_up = bit_pos + (face % 2 == 0 ? 1 : 0);
-
-          GLubyte type = voxels[get_axis_i(axis, right, forward, bit_pos)];
+          uint8_t mesh_left = right - merged_right[bit_pos];
+          uint8_t mesh_right = right + 1;
+          uint8_t mesh_front = forward - merged_forward[rightxCS_P + bit_pos];
+          uint8_t mesh_back = forward + 1;
+          uint8_t mesh_up = bit_pos + (face % 2 == 0 ? 1 : 0);
 
           uint8_t ao_LB = 3, ao_RB = 3, ao_RF = 3, ao_LF = 3;
           if (bake_ao) {
@@ -269,20 +292,15 @@ std::vector<uint32_t>* mesh(std::vector<uint8_t>& voxels, bool bake_ao) {
             v4 = get_vertex(mesh_back, mesh_right, mesh_up, type, face, ao_RB);
           }
 
-          insert_quad(vertices, v1, v2, v3, v4, ao_LB + ao_RF > ao_RB + ao_LF);
+          insert_quad(vertices, v1, v2, v3, v4, ao_LB + ao_RF > ao_RB + ao_LF, vertexI);
+
+          vertexI += 6;
         }
       }
     }
   }
 
-  size_t vertexLength = vertices->size();
-
-  if (vertexLength == 0) {
-    delete vertices;
-    return nullptr;
-  }
-
-  return vertices;
+   vertexLength = vertexI + 1;
 };
 
 #endif

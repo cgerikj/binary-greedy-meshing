@@ -11,6 +11,9 @@ Video by youtuber Tantan that showcases his Rust port and explains part of the a
 **UPDATE: 2024-04-19:**  
 **The ambient occlusion implementation was fixed - it should look better now.**
 
+**UPDATE: 2024-04-21:**  
+**Optimized the code to be up to ~25% faster.**
+
 ## Setup example (Visual Studio)
 ```
 > git clone https://github.com/cgerikj/binary-greedy-meshing --recursive
@@ -63,11 +66,17 @@ Meshes can be offset to world space using a per-draw uniform or by packing xyz i
 ## Benchmarks
 Average execution time running on Ryzen 3800x.
 
-| Scene                 | Milliseconds   | Vertices   |
+| Scene                 | Microseconds   | Vertices   |
 | ---------------------:|:--------------:|:----------:|
-| 3d hills (AO)         | 0.774          | 41753      |
-| 3d hills (No AO)      | 0.450          | 28378      |
-| Red sphere (AO)       | 0.785          | 71532      |
-| White noise (AO)      | 13.24          | 1596720    |
-| 3d checkerboard (AO)  | 22.27          | 4289904    |
-| Empty (AO)            | 0.174          | 0          |
+| 3d hills (AO)         | 590            | 41329      |
+| 3d hills (No AO)      | 391            | 28507      |
+| Red sphere (AO)       | 679            | 71533      |
+| Red sphere (No AO)    | 785            | 43201      |
+| Empty (AO)            | 174            | 0          |
+
+Old benchmarks, crashing with current vertex allocation number
+
+| Scene                 | Microseconds   | Vertices   |
+| ---------------------:|:--------------:|:----------:|
+| White noise (AO)      | 1324           | 1596720    |
+| 3d checkerboard (AO)  | 2227           | 4289904    |

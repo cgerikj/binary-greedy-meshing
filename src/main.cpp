@@ -11,7 +11,6 @@
 #include "misc/utility.h"
 
 #include "mesher.h"
-#include "mesher_simplified_32_no_voxel_types.h"
 
 void create_chunk();
 
@@ -100,12 +99,14 @@ Noise noise;
 float last_x = 0.0f;
 float last_y = 0.0f;
 
+std::vector<uint64_t> col_face_masks(CS_P2 * 6);
+
 enum class MESH_TYPE: int {
   TERRAIN,
-  RANDOM,
-  CHECKERBOARD,
   SPHERE,
   EMPTY,
+  CHECKERBOARD,
+  RANDOM,
   Count
 };
 
@@ -204,12 +205,26 @@ void create_chunk() {
     }
   }
 
-  auto vertices = mesh(voxels, true);
-  if (vertices == nullptr) {
-    vertexCount = 0;
-  } else {
-    vertexCount = vertices->size();
+  // Allocating 100,000 vertices (0.4 mb)
+  // Probably do something smarter here, allocate less data initially and double the size when needed (Dynamically sized vector is expensive to constantly grow)
+  std::vector<uint32_t>* vertices = new std::vector<uint32_t>(1000000);
+  std::fill(vertices->begin(), vertices->end(), 0);
 
+  {
+    // Pre-compute axis_cols and use for every iteration of the mesher
+    // Can be useful if the voxel data often changes
+    // To use this optimization, store axis_cols along with your original data and write to it
+    // auto axis_cols = generate_initial_axis_cols(voxels);
+
+    int iterations = 1000;
+    Timer timer(std::to_string(iterations) + " iterations", true);
+
+    for (int i = 0; i < iterations; i++) {
+      mesh(voxels, *vertices, vertexCount, true);
+    }
+  }
+
+  if (vertexCount) {
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(uint32_t), vertices->data(), GL_STATIC_DRAW);
