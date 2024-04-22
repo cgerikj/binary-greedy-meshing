@@ -282,7 +282,7 @@ int main(int argc, char* argv[]) {
 
   float forwardMove = 0.0f;
   float rightMove = 0.0f;
-  float noclipSpeed = 10.0f;
+  float noclipSpeed = 30.0f;
 
   float deltaTime = 0.0f;
 

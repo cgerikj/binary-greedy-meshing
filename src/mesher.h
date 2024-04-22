@@ -121,28 +121,6 @@ inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint32_t ty
   return (ao << 29) | (norm << 26) | (type << 18) | ((z - 1) << 12) | ((y - 1) << 6) | (x - 1);
 }
 
-std::vector<uint64_t>* generate_initial_axis_cols(std::vector<uint8_t>& voxels) {
-  std::vector<uint64_t>* axis_cols = new std::vector<uint64_t>(CS_P2 * 3);
-
-  auto p = voxels.begin();
-  for (int y = 0; y < CS_P; y++) {
-    for (int x = 0; x < CS_P; x++) {
-      uint64_t zb = 0;
-      for (int z = 0; z < CS_P; z++) {
-        if (solid_check(*p)) {
-          (*axis_cols)[x + (z * CS_P)] |= 1ULL << y;
-          (*axis_cols)[z + (y * CS_P) + (CS_P2)] |= 1ULL << x;
-          zb |= 1ULL << z;
-        }
-        p++;
-      }
-      (*axis_cols)[y + (x * CS_P) + (CS_P2 * 2)] = zb;
-    }
-  }
-
-  return axis_cols;
-}
-
 static const uint64_t CULL_MASK = (1ULL << CS_P - 1);
 
 // voxels - 64^3 (includes neighboring voxels)
@@ -152,20 +130,51 @@ void mesh(std::vector<uint8_t>& voxels, std::vector<uint32_t>& vertices, int& ve
   vertexLength = 0;
   int vertexI = 0;
 
-  // NOTE: axis_cols can be pre-computed as an optimization - not doing that here to simplify the demo
-  auto axis_cols = *generate_initial_axis_cols(voxels);
+  uint64_t col_face_masks[CS_P2 * 6] = { 0 };
 
-  uint64_t col_face_masks[CS_P2 * 6];
-  // Step 2: Visible face culling
-  for (int axis = 0; axis <= 2; axis++) {
-    for (int i = 1; i < CS_P2 - 1; i++) {
-      uint64_t col = axis_cols[(CS_P2 * axis) + i];
-      col_face_masks[(CS_P2 * (axis * 2)) + i] = col & ~((col >> 1) | CULL_MASK);
-      col_face_masks[(CS_P2 * (axis * 2 + 1)) + i] = col & ~((col << 1) | 1ULL);
+  // Begin culling faces
+  auto p = voxels.begin();
+
+  std::vector<uint64_t> a_axis_cols = std::vector<uint64_t>(CS_P2);
+  for (int a = 0; a < CS_P; a++) {
+
+    std::vector<uint64_t> b_axis_cols = std::vector<uint64_t>(CS_P);
+    for (int b = 0; b < CS_P; b++) {
+
+      uint64_t cb = 0;
+      for (int c = 0; c < CS_P; c++) {
+        if (solid_check(*p)) {
+          a_axis_cols[b + (c * CS_P)] |= 1ULL << a;
+          b_axis_cols[c] |= 1ULL << b;
+          cb |= 1ULL << c;
+        }
+        p++;
+      }
+
+      // Cull third axis faces
+      col_face_masks[a + (b * CS_P) + (4 * CS_P2)] = cb & ~((cb >> 1) | CULL_MASK);
+      col_face_masks[a + (b * CS_P) + (5 * CS_P2)] = cb & ~((cb << 1) | 1ULL);
+    }
+
+    // Cull second axis faces
+    for (int b = 1; b < CS_P - 1; b++) {
+      uint64_t col = b_axis_cols[b];
+      col_face_masks[b + (a * CS_P) + (2 * CS_P2)] = col & ~((col >> 1) | CULL_MASK);
+      col_face_masks[b + (a * CS_P) + (3 * CS_P2)] = col & ~((col << 1) | 1ULL);
     }
   }
 
-  // Step 3: Greedy meshing
+  // Cull first axis faces
+  for (int a = 1; a < CS_P - 1; a++) {
+    for (int b = 1; b < CS_P - 1; b++) {
+      uint64_t col = a_axis_cols[b + (a * CS_P)];
+
+      col_face_masks[b + (a * CS_P) + (0 * CS_P2)] = col & ~((col >> 1) | CULL_MASK);
+      col_face_masks[b + (a * CS_P) + (1 * CS_P2)] = col & ~((col << 1) | 1ULL);
+    }
+  }
+
+  // Greedy meshing
   for (uint8_t face = 0; face < 6; face++) {
     int axis = face / 2;
     int air_dir = face % 2 == 0 ? 1 : -1;
@@ -194,7 +203,7 @@ void mesh(std::vector<uint8_t>& voxels, std::vector<uint32_t>& vertices, int& ve
             voxels[get_axis_i(axis, right, forward, bit_pos)] == voxels[get_axis_i(axis, right, forward + 1, bit_pos)] &&
             (!bake_ao || compare_ao(voxels, axis, forward, right, bit_pos + air_dir, 1, 0))
           ) {
-          merged_forward[(right * CS_P) + bit_pos]++;
+            merged_forward[(right * CS_P) + bit_pos]++;
           }
           else {
             bits_merging_forward &= ~(1ULL << bit_pos);
@@ -218,7 +227,7 @@ void mesh(std::vector<uint8_t>& voxels, std::vector<uint32_t>& vertices, int& ve
             (merged_forward[(right * CS_P) + bit_pos] == merged_forward[(right + 1) * CS_P + bit_pos]) &&
             (type == voxels[get_axis_i(axis, right + 1, forward, bit_pos)]) &&
             (!bake_ao || compare_ao(voxels, axis, forward, right, bit_pos + air_dir, 0, 1))
-          ) {
+            ) {
             bits_walking_right |= 1ULL << bit_pos;
             merged_right[bit_pos]++;
             merged_forward[rightxCS_P + bit_pos] = 0;
@@ -300,7 +309,7 @@ void mesh(std::vector<uint8_t>& voxels, std::vector<uint32_t>& vertices, int& ve
     }
   }
 
-   vertexLength = vertexI + 1;
+  vertexLength = vertexI + 1;
 };
 
 #endif
