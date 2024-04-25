@@ -70,20 +70,20 @@ Meshes can be offset to world space using a per-draw uniform or by packing xyz i
 | ![](screenshots/cap5.png)  | ![](screenshots/cap6.png)  |
 
 ## Benchmarks
-Average execution time running on a Ryzen 3800x.
+Average execution time (1000+ runs)
 
-| Scene                   | Microseconds   | Vertices   |
-| -----------------------:|:--------------:|:----------:|
-| 3d hills (AO)           | 552            | 43021      |
-| 3d hills (No AO)        | 325            | 24751      |
-| Red sphere (AO)         | 656            | 71533      |
-| Red sphere (No AO)      | 317            | 43201      |
-| Empty (AO)              | 148            | 0          |
-| Empty (No AO)           | 125            | 0          |
-| White noise (AO)        | 10211          | 1594069    |
-| White noise (No AO)     | 3545           | 1415419    |
-| 3d checkerboard (AO)    | 11696          | 4289904    |
-| 3d checkerboard (No AO) | 6271           | 4289904    |
+| Scene                     | Ryzen 3800x                 |
+|:--------------------------|:----------------------------|
+| 3d hills (AO)             | 552us / 43021 verts         |
+| 3d hills (No AO)          | 325us / 24751 verts         |
+| Red sphere (AO)           | 656us / 71533 verts         |
+| Red sphere (No AO)        | 317us / 43201 verts         |
+| Empty (AO)                | 148us / 0 verts             |
+| Empty (No AO)             | 125us / 0 verts             |
+| White noise (AO)          | 10.211ms / 1594069 verts    |
+| White noise (No AO)       | 3.545ms / 1415419 verts     |
+| 3d checkerboard (AO)      | 11.696ms / 4289904 verts    |
+| 3d checkerboard (No AO)   | 6.271ms / 4289904 verts     |
 
 ## Other resources
 ### Meshing in a minecraft game:
