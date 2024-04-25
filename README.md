@@ -20,8 +20,9 @@ Demo of a larger world: https://www.youtube.com/watch?v=LxfDmF0HxSg
 > git clone https://github.com/cgerikj/binary-greedy-meshing --recursive
 > cd binary-greedy-meshing
 > mkdir build && cd build
-> cmake .. -G "Visual Studio 16 2019"
+> cmake .. -G "Visual Studio 17 2022"
 > start binaryMesher.sln
+> (Switch to Release Mode / RelWithDebInfo)
 ```
 
 ## Demo usage
@@ -33,18 +34,22 @@ Demo of a larger world: https://www.youtube.com/watch?v=LxfDmF0HxSg
 
 Meshing duration is printed to the console.
 
-## Algorithm usage
+## How to use the mesher
 The main implementation is in src/mesher.h
 
-Input data:  
-std::vector<uint8_t> voxels (values 0-31 usable)  
+### Input data:  
+**- std::vector<uint8_t>& voxels**  
+&nbsp;&nbsp;&nbsp;&nbsp; - The input data includes duplicate edge data from neighboring chunks which is used for visibility culling and AO. For optimal performance, your world data should already be structured this way so that you can feed the data straight into this algorithm.  
+&nbsp;&nbsp;&nbsp;&nbsp; - Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh. 
 
-* The input data includes duplicate edge data from neighboring chunks which is used for visibility culling and AO. For optimal performance, your world data should already be structured this way so that you can feed the data straight into this algorithm.
+**- MeshData& meshData**  
+&nbsp;&nbsp;&nbsp;&nbsp; - Data that needs to be allocated once (per thread if meshing with multiple threads)  
 
-* Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh. 
+**- bool bake_ao**  
+&nbsp;&nbsp;&nbsp;&nbsp; - true if you want baked ambient occlusion.  
 
-Output data:  
-std::vector<uint32_t> of vertices in chunk-space.
+### Output data:  
+&nbsp;&nbsp;&nbsp;&nbsp; - The allocated vertices in MeshData with a length of meshData.vertexCount.
 
 ## Mesh details
 
