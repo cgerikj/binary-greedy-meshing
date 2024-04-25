@@ -20,8 +20,9 @@ Demo of a larger world: https://www.youtube.com/watch?v=LxfDmF0HxSg
 > git clone https://github.com/cgerikj/binary-greedy-meshing --recursive
 > cd binary-greedy-meshing
 > mkdir build && cd build
-> cmake .. -G "Visual Studio 16 2019"
+> cmake .. -G "Visual Studio 17 2022"
 > start binaryMesher.sln
+> (Switch to Release Mode / RelWithDebInfo)
 ```
 
 ## Demo usage
@@ -33,18 +34,22 @@ Demo of a larger world: https://www.youtube.com/watch?v=LxfDmF0HxSg
 
 Meshing duration is printed to the console.
 
-## Algorithm usage
+## How to use the mesher
 The main implementation is in src/mesher.h
 
-Input data:  
-std::vector<uint8_t> voxels (values 0-31 usable)  
+### Input data:  
+**- std::vector<uint8_t>& voxels**  
+&nbsp;&nbsp;&nbsp;&nbsp; - The input data includes duplicate edge data from neighboring chunks which is used for visibility culling and AO. For optimal performance, your world data should already be structured this way so that you can feed the data straight into this algorithm.  
+&nbsp;&nbsp;&nbsp;&nbsp; - Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh. 
 
-* The input data includes duplicate edge data from neighboring chunks which is used for visibility culling and AO. For optimal performance, your world data should already be structured this way so that you can feed the data straight into this algorithm.
+**- MeshData& meshData**  
+&nbsp;&nbsp;&nbsp;&nbsp; - Data that needs to be allocated once (per thread if meshing with multiple threads)  
 
-* Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh. 
+**- bool bake_ao**  
+&nbsp;&nbsp;&nbsp;&nbsp; - true if you want baked ambient occlusion.  
 
-Output data:  
-std::vector<uint32_t> of vertices in chunk-space.
+### Output data:  
+&nbsp;&nbsp;&nbsp;&nbsp; - The allocated vertices in MeshData with a length of meshData.vertexCount.
 
 ## Mesh details
 
@@ -65,20 +70,20 @@ Meshes can be offset to world space using a per-draw uniform or by packing xyz i
 | ![](screenshots/cap5.png)  | ![](screenshots/cap6.png)  |
 
 ## Benchmarks
-Average execution time running on a Ryzen 3800x.
+Average execution time (1000+ runs)
 
-| Scene                   | Microseconds   | Vertices   |
-| -----------------------:|:--------------:|:----------:|
-| 3d hills (AO)           | 552            | 43021      |
-| 3d hills (No AO)        | 325            | 24751      |
-| Red sphere (AO)         | 656            | 71533      |
-| Red sphere (No AO)      | 317            | 43201      |
-| Empty (AO)              | 148            | 0          |
-| Empty (No AO)           | 125            | 0          |
-| White noise (AO)        | 10211          | 1594069    |
-| White noise (No AO)     | 3545           | 1415419    |
-| 3d checkerboard (AO)    | 11696          | 4289904    |
-| 3d checkerboard (No AO) | 6271           | 4289904    |
+| Scene                     | Ryzen 3800x                 |
+|:--------------------------|:----------------------------|
+| 3d hills (AO)             | 552us / 43021 verts         |
+| 3d hills (No AO)          | 325us / 24751 verts         |
+| Red sphere (AO)           | 656us / 71533 verts         |
+| Red sphere (No AO)        | 317us / 43201 verts         |
+| Empty (AO)                | 148us / 0 verts             |
+| Empty (No AO)             | 125us / 0 verts             |
+| White noise (AO)          | 10.211ms / 1594069 verts    |
+| White noise (No AO)       | 3.545ms / 1415419 verts     |
+| 3d checkerboard (AO)      | 11.696ms / 4289904 verts    |
+| 3d checkerboard (No AO)   | 6.271ms / 4289904 verts     |
 
 ## Other resources
 ### Meshing in a minecraft game:
