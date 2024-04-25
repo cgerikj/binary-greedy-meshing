@@ -159,12 +159,12 @@ void create_chunk() {
 
   switch (mesh_type) {
     case (int)MESH_TYPE::TERRAIN: {
-      noise.generateTerrain(voxels, std::rand());
+      noise.generateTerrain(voxels, 30);
       break;
     }
 
     case (int)MESH_TYPE::RANDOM: {
-      noise.generateWhiteNoiseTerrain(voxels, std::rand());
+      noise.generateWhiteNoiseTerrain(voxels, 30);
       break;
     }
 
@@ -270,8 +270,6 @@ int main(int argc, char* argv[]) {
   shader = new Shader("main", "main");
   camera = new Camera(glm::vec3(31, 65, -5));
   camera->handleResolution(1280, 720);
-
-  srand(time(NULL));
 
   float forwardMove = 0.0f;
   float rightMove = 0.0f;

@@ -72,18 +72,18 @@ Meshes can be offset to world space using a per-draw uniform or by packing xyz i
 ## Benchmarks
 Average execution time (1000+ runs)
 
-| Scene                     | Ryzen 7 3800x (Windows)      | Ryzen 7 5800h (Linux) | Ryzen 3950x (Windows) |
-|:--------------------------|:-----------------------------|-----------------------|-----------------------|
-| 3d hills (AO)             | 552us / 43021 verts          | 502us                 | 615ms
-| 3d hills (No AO)          | 325us / 24751 verts          | 
-| Red sphere (AO)           | 656us / 71533 verts          | 592us
-| Red sphere (No AO)        | 317us / 43201 verts          |
-| Empty (AO)                | 148us / 0 verts              | 221us
-| Empty (No AO)             | 125us / 0 verts              |
-| White noise (AO)          | 10.211ms / 1594069 verts     | 7.509ms
-| White noise (No AO)       | 3.545ms / 1415419 verts      | 
-| 3d checkerboard (AO)      | 11.696ms / 4289904 verts     | 8.154ms
-| 3d checkerboard (No AO)   | 6.271ms / 4289904 verts      |
+| Scene                  | Ryzen 7 3800x (Windows)      | Ryzen 7 5800h (Linux) | Ryzen 3950x (Windows) |
+|:-----------------------|:-----------------------------|-----------------------|-----------------------|
+| 3d hills (AO)          | 552us / 43021 verts          | 502us                 | 615ms
+| 3d hills (No AO)       | 325us / 24751 verts          | 
+| Red sphere (AO)        | 656us / 71533 verts          | 592us
+| Red sphere (No AO)     | 317us / 43201 verts          |
+| Empty (AO)             | 148us / 0 verts              | 221us
+| Empty (No AO)          | 125us / 0 verts              |
+| White noise (AO)       | 10.211ms / 1594069 verts     | 7.509ms
+| White noise (No AO)    | 3.545ms / 1415419 verts      | 
+| Checkerboard (AO)      | 11.696ms / 4289904 verts     | 8.154ms
+| Checkerboard (No AO)   | 6.271ms / 4289904 verts      |
 
 ## Other resources
 ### Meshing in a minecraft game:
