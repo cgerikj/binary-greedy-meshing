@@ -205,11 +205,6 @@ void create_chunk() {
   }
 
   {
-    // Pre-compute axis_cols and use for every iteration of the mesher
-    // Can be useful if the voxel data often changes
-    // To use this optimization, store axis_cols along with your original data and write to it
-    // auto axis_cols = generate_initial_axis_cols(voxels);
-
     int iterations = 1;
     Timer timer(std::to_string(iterations) + " iterations", true);
 

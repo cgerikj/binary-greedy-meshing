@@ -29,6 +29,8 @@ SOFTWARE.
 #include <glm/glm.hpp>
 #include <vector>
 #include <stdint.h>
+#include <string.h>
+
 #include "misc/timer.h"
 #include "constants.h"
 

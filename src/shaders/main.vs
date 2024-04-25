@@ -20,12 +20,12 @@ uniform vec3 NORMALS[6] = {
 };
 
 void main() {
-  float x = float(data&63);
-  float y = float((data >> 6)&63);
-  float z = float((data >> 12)&63);
-  uint type  = (data >> 18)&255;
-  uint norm  = (data >> 26)&7;
-  uint ao = (data >> 29)&3;
+  float x = float(data&63u);
+  float y = float((data >> 6)&63u);
+  float z = float((data >> 12)&63u);
+  uint type  = (data >> 18)&255u;
+  uint norm  = (data >> 26)&7u;
+  uint ao = (data >> 29)&3u;
   frag_ao = clamp(float(ao) / 3.0, 0.5, 1.0);
 
   frag_pos = vec3(x, y, z) - vec3(0.5);
