@@ -153,6 +153,8 @@ GLuint VAO, VBO;
 
 MeshData meshData;
 
+bool bake_ao = true;
+
 void create_chunk() {
   std::vector<uint8_t> voxels(CS_P3);
   std::fill(voxels.begin(), voxels.end(), 0);
@@ -206,11 +208,13 @@ void create_chunk() {
 
   {
     int iterations = 1;
-    Timer timer(std::to_string(iterations) + " iterations", true);
+    Timer timer(std::to_string(iterations) + " iterations " + (bake_ao ? "(AO)" : "(No AO)"), true);
 
     for (int i = 0; i < iterations; i++) {
-      mesh(voxels, meshData, true);
+      mesh(voxels, meshData, bake_ao);
     }
+
+    bake_ao = !bake_ao;
   }
 
   if (meshData.vertexCount) {
