@@ -99,14 +99,12 @@ Noise noise;
 float last_x = 0.0f;
 float last_y = 0.0f;
 
-std::vector<uint64_t> col_face_masks(CS_P2 * 6);
-
 enum class MESH_TYPE: int {
   TERRAIN,
   SPHERE,
-  EMPTY,
-  CHECKERBOARD,
   RANDOM,
+  CHECKERBOARD,
+  EMPTY,
   Count
 };
 
@@ -152,7 +150,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 }
 
 GLuint VAO, VBO;
-int vertexCount = 0;
+
+MeshData meshData;
 
 void create_chunk() {
   std::vector<uint8_t> voxels(CS_P3);
@@ -205,38 +204,29 @@ void create_chunk() {
     }
   }
 
-  // Allocating 100,000 vertices (0.4 mb)
-  // Probably do something smarter here, allocate less data initially and double the size when needed (Dynamically sized vector is expensive to constantly grow)
-  std::vector<uint32_t>* vertices = new std::vector<uint32_t>(1000000);
-  std::fill(vertices->begin(), vertices->end(), 0);
-
   {
     // Pre-compute axis_cols and use for every iteration of the mesher
     // Can be useful if the voxel data often changes
     // To use this optimization, store axis_cols along with your original data and write to it
     // auto axis_cols = generate_initial_axis_cols(voxels);
 
-    int iterations = 1000;
+    int iterations = 1;
     Timer timer(std::to_string(iterations) + " iterations", true);
 
     for (int i = 0; i < iterations; i++) {
-      mesh(voxels, *vertices, vertexCount, true);
+      mesh(voxels, meshData, true);
     }
   }
 
-  if (vertexCount) {
+  if (meshData.vertexCount) {
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(uint32_t), vertices->data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, meshData.vertexCount * sizeof(uint32_t), meshData.vertices->data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-
-    vertices->clear();
-    vertices->shrink_to_fit();
-    delete vertices;
   }
 
-  printf("vertex count: %i\n", vertexCount);
+  printf("vertex count: %i\n", meshData.vertexCount);
 }
 
 int main(int argc, char* argv[]) {
@@ -272,6 +262,14 @@ int main(int argc, char* argv[]) {
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+  meshData.vertices = new std::vector<uint32_t>(10000);
+  meshData.maxVertices = 10000;
+  meshData.col_face_masks = new std::vector<uint64_t>(CS_P2 * 6);
+  meshData.a_axis_cols = new std::vector<uint64_t>(CS_P2);
+  meshData.b_axis_cols = new std::vector<uint64_t>(CS_P);
+  meshData.merged_right = new std::vector<uint64_t>(CS_P);
+  meshData.merged_forward = new std::vector<uint64_t>(CS_P2);
+
   create_chunk();
 
   shader = new Shader("main", "main");
@@ -282,7 +280,7 @@ int main(int argc, char* argv[]) {
 
   float forwardMove = 0.0f;
   float rightMove = 0.0f;
-  float noclipSpeed = 10.0f;
+  float noclipSpeed = 30.0f;
 
   float deltaTime = 0.0f;
 
@@ -304,13 +302,13 @@ int main(int argc, char* argv[]) {
     auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
     camera->position += noclipSpeed * wishdir * deltaTime;
 
-    if (vertexCount > 0) {
+    if (meshData.vertexCount > 0) {
       shader->use();
       shader->setMat4("u_projection", camera->projection);
       shader->setMat4("u_view", camera->getViewMatrix());
       shader->setVec3("eye_position", camera->position);
       glBindVertexArray(VAO);
-      glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+      glDrawArrays(GL_TRIANGLES, 0, meshData.vertexCount);
       glBindVertexArray(0);
     }
 
