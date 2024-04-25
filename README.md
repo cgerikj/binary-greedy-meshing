@@ -6,13 +6,14 @@ This repository serves as a simple example project for the algorithm.
 
 Demo of a larger world: https://www.youtube.com/watch?v=LxfDmF0HxSg
 
-Video by youtuber Tantan that showcases his Rust port and explains part of the algorithm: https://www.youtube.com/watch?v=qnGoGq7DWMc
-
 **UPDATE: 2024-04-19:**  
 **The ambient occlusion implementation was fixed - it should look better now.**
 
 **UPDATE: 2024-04-21:**  
-**Optimized the code to be up to ~25% faster.**
+**Optimized the code to be up to 25% faster.**
+
+**UPDATE: 2024-04-25:**  
+**Optimized the code to be up to 15% faster and allocate less memory on every run.**
 
 ## Setup example (Visual Studio)
 ```
@@ -64,19 +65,24 @@ Meshes can be offset to world space using a per-draw uniform or by packing xyz i
 | ![](screenshots/cap5.png)  | ![](screenshots/cap6.png)  |
 
 ## Benchmarks
-Average execution time running on Ryzen 3800x.
+Average execution time running on a Ryzen 3800x.
 
-| Scene                 | Microseconds   | Vertices   |
-| ---------------------:|:--------------:|:----------:|
-| 3d hills (AO)         | 590            | 41329      |
-| 3d hills (No AO)      | 391            | 28507      |
-| Red sphere (AO)       | 679            | 71533      |
-| Red sphere (No AO)    | 785            | 43201      |
-| Empty (AO)            | 174            | 0          |
+| Scene                   | Microseconds   | Vertices   |
+| -----------------------:|:--------------:|:----------:|
+| 3d hills (AO)           | 552            | 43021      |
+| 3d hills (No AO)        | 325            | 24751      |
+| Red sphere (AO)         | 656            | 71533      |
+| Red sphere (No AO)      | 317            | 43201      |
+| Empty (AO)              | 148            | 0          |
+| Empty (No AO)           | 125            | 0          |
+| White noise (AO)        | 10211          | 1594069    |
+| White noise (No AO)     | 3545           | 1415419    |
+| 3d checkerboard (AO)    | 11696          | 4289904    |
+| 3d checkerboard (No AO) | 6271           | 4289904    |
 
-Old benchmarks, crashing with current vertex allocation number
+## Other resources
+### Meshing in a minecraft game:
+https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/  
 
-| Scene                 | Microseconds   | Vertices   |
-| ---------------------:|:--------------:|:----------:|
-| White noise (AO)      | 1324           | 1596720    |
-| 3d checkerboard (AO)  | 2227           | 4289904    |
+### Ambient occlusion for Minecraft-like worlds
+https://0fps.net/2013/07/03/ambient-occlusion-for-minecraft-like-worlds/
