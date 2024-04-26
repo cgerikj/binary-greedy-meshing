@@ -102,6 +102,7 @@ inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint32_t ty
 }
 
 static const uint64_t CULL_MASK = (1ULL << CS_P - 1);
+static const uint64_t BORDER_MASK = (1ULL | (1ULL <<  CS_P - 1));
 
 struct MeshData {
   std::vector<uint64_t>* col_face_masks = nullptr; // CS_P2 * 6
@@ -187,7 +188,7 @@ void mesh(std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
       for (int right = 1; right < CS_P - 1; right++) {
         int rightxCS_P = right * CS_P;
 
-        uint64_t bits_here = col_face_masks[forwardIndex + right];
+        uint64_t bits_here = col_face_masks[forwardIndex + right] &~ BORDER_MASK;
         uint64_t bits_right = right >= CS ? 0 : col_face_masks[forwardIndex + right + 1];
         uint64_t bits_forward = forward >= CS ? 0 : col_face_masks[forwardIndex + right + CS_P];
 
@@ -205,8 +206,6 @@ void mesh(std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
           #endif
 
           copy_front &= ~(1ULL << bit_pos);
-
-          if (bit_pos < 1 || bit_pos >= CS_P - 1) continue;
 
           if(
             voxels[get_axis_i(axis, right, forward, bit_pos)] == voxels[get_axis_i(axis, right, forward + 1, bit_pos)] &&
@@ -229,11 +228,6 @@ void mesh(std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
 
           bits_stopped_forward &= ~(1ULL << bit_pos);
 
-          // Discards faces from neighbor voxels
-          if (bit_pos < 1 || bit_pos >= CS_P - 1) {
-            continue;
-          }
-
           uint8_t type = voxels[get_axis_i(axis, right, forward, bit_pos)];
 
           if (
@@ -247,6 +241,7 @@ void mesh(std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
             merged_forward[rightxCS_P + bit_pos] = 0;
             continue;
           }
+
           bits_walking_right &= ~(1ULL << bit_pos);
 
           uint8_t mesh_left = right - merged_right[bit_pos];
