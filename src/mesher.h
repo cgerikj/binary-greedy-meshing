@@ -1,4 +1,4 @@
-/* 
+/*
 MIT License
 
 Copyright (c) 2020 Erik Johansson
@@ -25,27 +25,25 @@ SOFTWARE.
 #ifndef MESHER_H
 #define MESHER_H
 
-#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <vector>
 #include <stdint.h>
-#include <string.h>
+#include <string.h> // memset
 
-#include "misc/timer.h"
 #include "constants.h"
 
-inline const int get_axis_i(const int &axis, const int &a, const int &b, const int &c) {
+static inline const int get_axis_i(const int axis, const int a, const int b, const int c) {
   if (axis == 0) return b + (a * CS_P) + (c * CS_P2);
   else if (axis == 1) return a + (c * CS_P) + (b* CS_P2);
   else return c + (b * CS_P) + (a * CS_P2);
 }
 
 // Add checks to this function to skip culling against grass for example
-inline const bool solid_check(int voxel) {
+static inline const bool solid_check(int voxel) {
   return voxel > 0;
 }
 
-inline constexpr glm::ivec2 ao_dirs[8] = {
+static const glm::ivec2 ao_dirs[8] = {
   glm::ivec2(-1, 0),
    glm::ivec2(0, -1),
    glm::ivec2(0, 1),
@@ -56,11 +54,11 @@ inline constexpr glm::ivec2 ao_dirs[8] = {
    glm::ivec2(1, 1),
 };
 
-inline const int vertexAO(uint8_t& side1, uint8_t& side2, uint8_t& corner) {
+static inline const int vertexAO(uint8_t side1, uint8_t side2, uint8_t corner) {
   return (side1 && side2) ? 0 : (3 - (side1 + side2 + corner));
 }
 
-inline const bool compare_ao(std::vector<uint8_t>& voxels, int& axis, int& forward, int& right, int c, int forward_offset, int right_offset) {
+static inline const bool compare_ao(const std::vector<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
   for (auto& ao_dir : ao_dirs) {
     if (solid_check(voxels[get_axis_i(axis, right + ao_dir[0], forward + ao_dir[1], c)]) !=
       solid_check(voxels[get_axis_i(axis, right + right_offset + ao_dir[0], forward + forward_offset + ao_dir[1], c)])
@@ -71,7 +69,7 @@ inline const bool compare_ao(std::vector<uint8_t>& voxels, int& axis, int& forwa
   return true;
 }
 
-inline const void insert_quad(std::vector<uint32_t>& vertices, uint32_t& v1, uint32_t& v2, uint32_t& v3, uint32_t& v4, bool flipped, int& vertexI, int& maxVertices) {
+static inline const void insert_quad(std::vector<uint32_t>& vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped, int& vertexI, int& maxVertices) {
   if (vertexI >= maxVertices - 6) {
     vertices.resize(maxVertices * 2, 0);
     maxVertices *= 2;
@@ -97,12 +95,12 @@ inline const void insert_quad(std::vector<uint32_t>& vertices, uint32_t& v1, uin
   vertexI += 6;
 }
 
-inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t norm, uint32_t ao) {
+static inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t norm, uint32_t ao) {
   return (ao << 29) | (norm << 26) | (type << 18) | ((z - 1) << 12) | ((y - 1) << 6) | (x - 1);
 }
 
-static const uint64_t CULL_MASK = (1ULL << CS_P - 1);
-static const uint64_t BORDER_MASK = (1ULL | (1ULL <<  CS_P - 1));
+static const uint64_t CULL_MASK = (1ULL << (CS_P - 1));
+static const uint64_t BORDER_MASK = (1ULL | (1ULL <<  (CS_P - 1)));
 
 struct MeshData {
   std::vector<uint64_t>* col_face_masks = nullptr; // CS_P2 * 6
@@ -119,7 +117,7 @@ struct MeshData {
 // voxels - 64^3 (includes neighboring voxels)
 // vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
 // vertexLength - output  number of vertices to read from vertices
-void mesh(std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
+void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
   meshData.vertexCount = 0;
   int vertexI = 0;
 
@@ -137,7 +135,7 @@ void mesh(std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
 
     for (int b = 0; b < CS_P; b++) {
       uint64_t cb = 0;
-      
+
       for (int c = 0; c < CS_P; c++) {
         if (solid_check(*p)) {
           a_axis_cols[b + (c * CS_P)] |= 1ULL << a;
@@ -317,6 +315,6 @@ void mesh(std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
   }
 
   meshData.vertexCount = vertexI + 1;
-};
+}
 
 #endif
