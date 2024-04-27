@@ -109,6 +109,14 @@ struct MeshData {
   std::vector<uint64_t>* merged_right = nullptr; // CS_P
   std::vector<uint64_t>* merged_forward = nullptr; // CS_P2
 
+  // Vertex data is packed into one unsigned integer:
+  // - x, y, z: 6 bit each (0-63)
+  // - Type: 8 bit (0-255)
+  // - Normal: 3 bit (0-5)
+  // - AO: 2 bit
+  //
+  // Meshes can be offset to world space using a per-draw uniform or by packing xyz
+  // in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
   std::vector<uint32_t>* vertices = nullptr;
   int vertexCount = 0;
   int maxVertices = 0;
@@ -117,6 +125,15 @@ struct MeshData {
 // voxels - 64^3 (includes neighboring voxels)
 // vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
 // vertexLength - output  number of vertices to read from vertices
+//
+// @param[in] voxels The input data includes duplicate edge data from neighboring chunks which is used
+// for visibility culling and AO. For optimal performance, your world data should already be structured
+// this way so that you can feed the data straight into this algorithm.
+// Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh.
+//
+// @param[out] meshData The allocated vertices in MeshData with a length of meshData.vertexCount.
+//
+// @param[in] bake_ao true if you want baked ambient occlusion.
 void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
   meshData.vertexCount = 0;
   int vertexI = 0;
