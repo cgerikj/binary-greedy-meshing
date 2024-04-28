@@ -66,6 +66,18 @@ struct MeshData {
   int maxVertices = 0;
 };
 
+// voxels - 64^3 (includes neighboring voxels)
+// vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
+// vertexLength - output  number of vertices to read from vertices
+//
+// @param[in] voxels The input data includes duplicate edge data from neighboring chunks which is used
+// for visibility culling and AO. For optimal performance, your world data should already be structured
+// this way so that you can feed the data straight into this algorithm.
+// Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh.
+//
+// @param[out] meshData The allocated vertices in MeshData with a length of meshData.vertexCount.
+//
+// @param[in] bake_ao true if you want baked ambient occlusion.
 void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao = true);
 
 #endif // MESHER_H
@@ -143,18 +155,6 @@ static inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint
 static const uint64_t CULL_MASK = (1ULL << (CS_P - 1));
 static const uint64_t BORDER_MASK = (1ULL | (1ULL <<  (CS_P - 1)));
 
-// voxels - 64^3 (includes neighboring voxels)
-// vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
-// vertexLength - output  number of vertices to read from vertices
-//
-// @param[in] voxels The input data includes duplicate edge data from neighboring chunks which is used
-// for visibility culling and AO. For optimal performance, your world data should already be structured
-// this way so that you can feed the data straight into this algorithm.
-// Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh.
-//
-// @param[out] meshData The allocated vertices in MeshData with a length of meshData.vertexCount.
-//
-// @param[in] bake_ao true if you want baked ambient occlusion.
 void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
   meshData.vertexCount = 0;
   int vertexI = 0;
