@@ -2,13 +2,12 @@
 #include <GLFW/glfw3.h>
 
 #include <glad/glad.h>
-#include <iostream>
-#include <vector>
 #include <algorithm>
 #include "misc/shader.h"
 #include "misc/camera.h"
 #include "misc/noise.h"
 #include "misc/utility.h"
+#include "misc/timer.h"
 
 #include "mesher.h"
 
