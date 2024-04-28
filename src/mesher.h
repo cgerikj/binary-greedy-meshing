@@ -83,7 +83,11 @@ void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao = t
 #endif // MESHER_H
 
 #ifdef BM_IMPLEMENTATION
+
+#ifndef BM_MEMSET
+#define BM_MEMSET memset
 #include <string.h> // memset
+#endif
 
 static inline const int get_axis_i(const int axis, const int a, const int b, const int c) {
   if (axis == 0) return b + (a * CS_P) + (c * CS_P2);
@@ -167,9 +171,9 @@ void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
 
   // Begin culling faces
   auto p = voxels.begin();
-  memset(a_axis_cols.data(), 0, CS_P2);
+  BM_MEMSET(a_axis_cols.data(), 0, CS_P2);
   for (int a = 0; a < CS_P; a++) {
-    memset(b_axis_cols.data(), 0, CS_P * 8);
+    BM_MEMSET(b_axis_cols.data(), 0, CS_P * 8);
 
     for (int b = 0; b < CS_P; b++) {
       uint64_t cb = 0;
@@ -213,13 +217,13 @@ void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
     int axis = face / 2;
     int air_dir = face % 2 == 0 ? 1 : -1;
 
-    memset(merged_forward.data(), 0, CS_P2 * 8);
+    BM_MEMSET(merged_forward.data(), 0, CS_P2 * 8);
 
     for (int forward = 1; forward < CS_P - 1; forward++) {
       uint64_t bits_walking_right = 0;
       int forwardIndex = (forward * CS_P) + (face * CS_P2);
 
-      memset(merged_right.data(), 0, CS_P * 8);
+      BM_MEMSET(merged_right.data(), 0, CS_P * 8);
 
       for (int right = 1; right < CS_P - 1; right++) {
         int rightxCS_P = right * CS_P;
