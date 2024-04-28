@@ -25,12 +25,53 @@ SOFTWARE.
 #ifndef MESHER_H
 #define MESHER_H
 
+#ifndef BM_IVEC2
 #include <glm/glm.hpp>
-#include <vector>
-#include <stdint.h>
-#include <string.h> // memset
+#define BM_IVEC2 glm::ivec2
+#endif
 
-#include "constants.h"
+#ifndef BM_VECTOR
+#include <vector>
+#define BM_VECTOR std::vector
+#endif
+
+#include <stdint.h>
+
+// CS = chunk size (max 62)
+static constexpr int CS = 62;
+
+// Padded chunk size
+static constexpr int CS_P = CS + 2;
+static constexpr int CS_2 = CS * CS;
+static constexpr int CS_P2 = CS_P * CS_P;
+static constexpr int CS_P3 = CS_P * CS_P * CS_P;
+
+struct MeshData {
+  BM_VECTOR<uint64_t>* col_face_masks = nullptr; // CS_P2 * 6
+  BM_VECTOR<uint64_t>* a_axis_cols = nullptr; // CS_P2
+  BM_VECTOR<uint64_t>* b_axis_cols = nullptr; // CS_P
+  BM_VECTOR<uint64_t>* merged_right = nullptr; // CS_P
+  BM_VECTOR<uint64_t>* merged_forward = nullptr; // CS_P2
+
+  // Vertex data is packed into one unsigned integer:
+  // - x, y, z: 6 bit each (0-63)
+  // - Type: 8 bit (0-255)
+  // - Normal: 3 bit (0-5)
+  // - AO: 2 bit
+  //
+  // Meshes can be offset to world space using a per-draw uniform or by packing xyz
+  // in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
+  BM_VECTOR<uint32_t>* vertices = nullptr;
+  int vertexCount = 0;
+  int maxVertices = 0;
+};
+
+void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao = true);
+
+#endif // MESHER_H
+
+#ifdef BM_IMPLEMENTATION
+#include <string.h> // memset
 
 static inline const int get_axis_i(const int axis, const int a, const int b, const int c) {
   if (axis == 0) return b + (a * CS_P) + (c * CS_P2);
@@ -43,22 +84,22 @@ static inline const bool solid_check(int voxel) {
   return voxel > 0;
 }
 
-static const glm::ivec2 ao_dirs[8] = {
-  glm::ivec2(-1, 0),
-   glm::ivec2(0, -1),
-   glm::ivec2(0, 1),
-   glm::ivec2(1, 0),
-   glm::ivec2(-1, -1),
-   glm::ivec2(-1, 1),
-   glm::ivec2(1, -1),
-   glm::ivec2(1, 1),
+static const BM_IVEC2 ao_dirs[8] = {
+  BM_IVEC2(-1, 0),
+  BM_IVEC2(0, -1),
+  BM_IVEC2(0, 1),
+  BM_IVEC2(1, 0),
+  BM_IVEC2(-1, -1),
+  BM_IVEC2(-1, 1),
+  BM_IVEC2(1, -1),
+  BM_IVEC2(1, 1),
 };
 
 static inline const int vertexAO(uint8_t side1, uint8_t side2, uint8_t corner) {
   return (side1 && side2) ? 0 : (3 - (side1 + side2 + corner));
 }
 
-static inline const bool compare_ao(const std::vector<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
+static inline const bool compare_ao(const BM_VECTOR<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
   for (auto& ao_dir : ao_dirs) {
     if (solid_check(voxels[get_axis_i(axis, right + ao_dir[0], forward + ao_dir[1], c)]) !=
       solid_check(voxels[get_axis_i(axis, right + right_offset + ao_dir[0], forward + forward_offset + ao_dir[1], c)])
@@ -69,7 +110,7 @@ static inline const bool compare_ao(const std::vector<uint8_t>& voxels, int axis
   return true;
 }
 
-static inline const void insert_quad(std::vector<uint32_t>& vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped, int& vertexI, int& maxVertices) {
+static inline const void insert_quad(BM_VECTOR<uint32_t>& vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped, int& vertexI, int& maxVertices) {
   if (vertexI >= maxVertices - 6) {
     vertices.resize(maxVertices * 2, 0);
     maxVertices *= 2;
@@ -102,26 +143,6 @@ static inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint
 static const uint64_t CULL_MASK = (1ULL << (CS_P - 1));
 static const uint64_t BORDER_MASK = (1ULL | (1ULL <<  (CS_P - 1)));
 
-struct MeshData {
-  std::vector<uint64_t>* col_face_masks = nullptr; // CS_P2 * 6
-  std::vector<uint64_t>* a_axis_cols = nullptr; // CS_P2
-  std::vector<uint64_t>* b_axis_cols = nullptr; // CS_P
-  std::vector<uint64_t>* merged_right = nullptr; // CS_P
-  std::vector<uint64_t>* merged_forward = nullptr; // CS_P2
-
-  // Vertex data is packed into one unsigned integer:
-  // - x, y, z: 6 bit each (0-63)
-  // - Type: 8 bit (0-255)
-  // - Normal: 3 bit (0-5)
-  // - AO: 2 bit
-  //
-  // Meshes can be offset to world space using a per-draw uniform or by packing xyz
-  // in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
-  std::vector<uint32_t>* vertices = nullptr;
-  int vertexCount = 0;
-  int maxVertices = 0;
-};
-
 // voxels - 64^3 (includes neighboring voxels)
 // vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
 // vertexLength - output  number of vertices to read from vertices
@@ -134,7 +155,7 @@ struct MeshData {
 // @param[out] meshData The allocated vertices in MeshData with a length of meshData.vertexCount.
 //
 // @param[in] bake_ao true if you want baked ambient occlusion.
-void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
+void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
   meshData.vertexCount = 0;
   int vertexI = 0;
 
@@ -333,5 +354,4 @@ void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) 
 
   meshData.vertexCount = vertexI + 1;
 }
-
-#endif
+#endif // BM_IMPLEMENTATION
