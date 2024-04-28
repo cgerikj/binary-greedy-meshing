@@ -22,6 +22,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+//   Define BM_IMPLEMENTATION in exactly one source file to include the implementation
+//   and include the mesher.h without that define as often as needed
+//
+//   it could look like this
+//
+//   #define BM_IMPLEMENTATION
+//   #include "mesher.h"
+//
+//   There are other defines to control the behaviour of the library.
+//   * Define BM_IVEC2 with your own vector implementation - otherwise it will use glm::ivec2
+//   * Define BM_VECTOR with your own vector implementation - otherwise it will use std::vector
+
 #ifndef MESHER_H
 #define MESHER_H
 
