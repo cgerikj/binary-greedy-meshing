@@ -147,7 +147,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
 
           uint8_t meshFront = forward - forwardMerged[bitPos];
           uint8_t meshLeft = bitPos;
-          uint8_t meshUp = layer + (face & 1);
+          uint8_t meshUp = layer + (~face & 1);
 
           uint8_t meshWidth = rightMerged;
           uint8_t meshLength = forwardMerged[bitPos] + 1;
@@ -157,25 +157,25 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
 
           uint32_t v1, v2, v3, v4;
           if (face == 0) {
-            v1 = get_vertex(meshFront, meshUp + 1, meshLeft, type, face);
-            v2 = get_vertex(meshFront, meshUp + 1, meshLeft + meshWidth, type, face);
-            v3 = get_vertex(meshFront + meshLength, meshUp + 1, meshLeft + meshWidth, type, face);
-            v4 = get_vertex(meshFront + meshLength, meshUp + 1, meshLeft, type, face);
+            v1 = get_vertex(meshFront, meshUp, meshLeft, type, face);
+            v2 = get_vertex(meshFront, meshUp, meshLeft + meshWidth, type, face);
+            v3 = get_vertex(meshFront + meshLength, meshUp, meshLeft + meshWidth, type, face);
+            v4 = get_vertex(meshFront + meshLength, meshUp, meshLeft, type, face);
           } else if (face == 1) {
-            v1 = get_vertex(meshFront + meshLength, meshUp - 1, meshLeft + meshWidth, type, face);
-            v2 = get_vertex(meshFront, meshUp - 1, meshLeft + meshWidth, type, face);
-            v3 = get_vertex(meshFront, meshUp - 1, meshLeft, type, face);
-            v4 = get_vertex(meshFront + meshLength, meshUp - 1, meshLeft, type, face);
+            v1 = get_vertex(meshFront + meshLength, meshUp, meshLeft + meshWidth, type, face);
+            v2 = get_vertex(meshFront, meshUp, meshLeft + meshWidth, type, face);
+            v3 = get_vertex(meshFront, meshUp, meshLeft, type, face);
+            v4 = get_vertex(meshFront + meshLength, meshUp, meshLeft, type, face);
           } else if (face == 2) {
-            v1 = get_vertex(meshUp + 1, meshFront + meshLength, meshLeft, type, face);
-            v2 = get_vertex(meshUp + 1, meshFront + meshLength, meshLeft + meshWidth, type, face);
-            v3 = get_vertex(meshUp + 1, meshFront, meshLeft + meshWidth, type, face);
-            v4 = get_vertex(meshUp + 1, meshFront, meshLeft, type, face);
+            v1 = get_vertex(meshUp, meshFront + meshLength, meshLeft, type, face);
+            v2 = get_vertex(meshUp, meshFront + meshLength, meshLeft + meshWidth, type, face);
+            v3 = get_vertex(meshUp, meshFront, meshLeft + meshWidth, type, face);
+            v4 = get_vertex(meshUp, meshFront, meshLeft, type, face);
           } else if (face == 3) {
-            v1 = get_vertex(meshUp - 1, meshFront + meshLength, meshLeft, type, face);
-            v2 = get_vertex(meshUp - 1, meshFront, meshLeft, type, face);
-            v3 = get_vertex(meshUp - 1, meshFront, meshLeft + meshWidth, type, face);
-            v4 = get_vertex(meshUp - 1, meshFront + meshLength, meshLeft + meshWidth, type, face);
+            v1 = get_vertex(meshUp, meshFront + meshLength, meshLeft, type, face);
+            v2 = get_vertex(meshUp, meshFront, meshLeft, type, face);
+            v3 = get_vertex(meshUp, meshFront, meshLeft + meshWidth, type, face);
+            v4 = get_vertex(meshUp, meshFront + meshLength, meshLeft + meshWidth, type, face);
           }
 
           insert_quad(*meshData.vertices, v1, v2, v3, v4, vertexI, meshData.maxVertices);
@@ -223,7 +223,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
 
           uint8_t meshLeft = right - rightMerged[bitPos - 1];
           uint8_t meshFront = forward - forwardMerged[right * CS + bitPos - 1];
-          uint8_t meshUp = bitPos - 1 + (face & 1);
+          uint8_t meshUp = bitPos - 1 + (~face & 1);
 
           uint8_t meshWidth = 1 + rightMerged[bitPos - 1];
           uint8_t meshLength = 1 + forwardMerged[right * CS + bitPos - 1];
@@ -233,15 +233,15 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
 
           uint32_t v1, v2, v3, v4;
           if (face == 4) {
-            v1 = get_vertex(meshFront + meshLength, meshLeft, meshUp + 1, type, face);
-            v2 = get_vertex(meshFront + meshLength, meshLeft + meshWidth, meshUp + 1, type, face);
-            v3 = get_vertex(meshFront, meshLeft + meshWidth, meshUp + 1, type, face);
-            v4 = get_vertex(meshFront, meshLeft, meshUp + 1, type, face);
+            v1 = get_vertex(meshFront + meshLength, meshLeft, meshUp, type, face);
+            v2 = get_vertex(meshFront + meshLength, meshLeft + meshWidth, meshUp, type, face);
+            v3 = get_vertex(meshFront, meshLeft + meshWidth, meshUp, type, face);
+            v4 = get_vertex(meshFront, meshLeft, meshUp, type, face);
           } else if (face == 5) {
-            v1 = get_vertex(meshFront + meshLength, meshLeft, meshUp - 1, type, face);
-            v2 = get_vertex(meshFront, meshLeft, meshUp - 1, type, face);
-            v3 = get_vertex(meshFront, meshLeft + meshWidth, meshUp - 1, type, face);
-            v4 = get_vertex(meshFront + meshLength, meshLeft + meshWidth, meshUp - 1, type, face);
+            v1 = get_vertex(meshFront + meshLength, meshLeft, meshUp, type, face);
+            v2 = get_vertex(meshFront, meshLeft, meshUp, type, face);
+            v3 = get_vertex(meshFront, meshLeft + meshWidth, meshUp, type, face);
+            v4 = get_vertex(meshFront + meshLength, meshLeft + meshWidth, meshUp, type, face);
           }
 
           insert_quad(*meshData.vertices, v1, v2, v3, v4, vertexI, meshData.maxVertices);
