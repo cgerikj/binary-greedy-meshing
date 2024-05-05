@@ -273,10 +273,11 @@ int main(int argc, char* argv[]) {
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+  meshData.axis_cols = new uint64_t[CS_P2] { 0 };
+  meshData.col_face_masks = new uint64_t[CS_2 * 6] { 0 };
+
   meshData.vertices = new std::vector<uint32_t>(10000);
   meshData.maxVertices = 10000;
-  meshData.col_face_masks = new uint64_t[CS_P2 * 6] { 0 };
-  meshData.axis_cols = new uint64_t[CS_P2] { 0 };
 
   create_chunk();
 

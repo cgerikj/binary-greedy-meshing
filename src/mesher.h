@@ -59,7 +59,7 @@ static inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint
 }
 
 struct MeshData {
-  uint64_t* col_face_masks = nullptr; // CS_P2 * 6
+  uint64_t* col_face_masks = nullptr; // CS_2 * 6
   uint64_t* axis_cols = nullptr; //CS_P2
 
   // Vertex data is packed into one unsigned integer:
@@ -111,8 +111,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
   }
 
   //Greedy meshing faces 0-3
-  uint8_t forwardMerged[CS_2];
-  memset(forwardMerged, 1, CS);
+  uint8_t forwardMerged[CS_2] { 0 };
   for (int face = 0; face < 4; face++) {
     int axis = face / 2;
 
@@ -141,19 +140,19 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
 
           for (int right = bitPos + 1; right < CS; right++) {
             if (!(bitsHere >> right & 1) || forwardMerged[bitPos] != forwardMerged[right] || type != voxels[get_axis_i(axis, forward + 1, right + 1, layer + 1)]) break;
-            forwardMerged[right] = 1;
+            forwardMerged[right] = 0;
             rightMerged++;
           }
           bitsHere &= ~((1ull << (bitPos + rightMerged)) - 1);
 
-          uint8_t meshFront = forward - forwardMerged[bitPos] + 1;
+          uint8_t meshFront = forward - forwardMerged[bitPos];
           uint8_t meshLeft = bitPos;
           uint8_t meshUp = layer + (face & 1);
 
           uint8_t meshWidth = rightMerged;
-          uint8_t meshLength = forwardMerged[bitPos];
+          uint8_t meshLength = forwardMerged[bitPos] + 1;
 
-          forwardMerged[bitPos] = 1;
+          forwardMerged[bitPos] = 0;
           rightMerged = 1;
 
           uint32_t v1, v2, v3, v4;
@@ -186,7 +185,6 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
   }
 
   //Greedy meshing faces 4-5
-  memset(forwardMerged, 0, CS_2);
   uint8_t rightMerged[CS] { 0 };
   for (int face = 4; face < 6; face++) {
     int axis = face / 2;
