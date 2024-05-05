@@ -55,7 +55,7 @@ static inline const void insert_quad(std::vector<uint32_t>& vertices, uint32_t v
 }
 
 static inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t norm) {
-  return (3u << 29) | (norm << 26) | (type << 18) | ((z - 1) << 12) | ((y - 1) << 6) | (x - 1);
+  return (3u << 29) | (norm << 26) | (type << 18) | (z << 12) | (y << 6) | x;
 }
 
 struct MeshData {
@@ -146,9 +146,9 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
           }
           bitsHere &= ~((1ull << (bitPos + rightMerged)) - 1);
 
-          uint8_t meshFront = forward - forwardMerged[bitPos] + 2;
-          uint8_t meshLeft = bitPos + 1;
-          uint8_t meshUp = layer + (face & 1) + 1;
+          uint8_t meshFront = forward - forwardMerged[bitPos] + 1;
+          uint8_t meshLeft = bitPos;
+          uint8_t meshUp = layer + (face & 1);
 
           uint8_t meshWidth = rightMerged;
           uint8_t meshLength = forwardMerged[bitPos];
@@ -223,9 +223,9 @@ void mesh(const uint8_t* voxels, MeshData& meshData, bool bake_ao) {
             continue;
           }
 
-          uint8_t meshLeft = right - rightMerged[bitPos - 1] + 1;
-          uint8_t meshFront = forward - forwardMerged[right * CS + bitPos - 1] + 1;
-          uint8_t meshUp = bitPos - 1 + (face & 1) + 1;
+          uint8_t meshLeft = right - rightMerged[bitPos - 1];
+          uint8_t meshFront = forward - forwardMerged[right * CS + bitPos - 1];
+          uint8_t meshUp = bitPos - 1 + (face & 1);
 
           uint8_t meshWidth = 1 + rightMerged[bitPos - 1];
           uint8_t meshLength = 1 + forwardMerged[right * CS + bitPos - 1];
