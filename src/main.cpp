@@ -99,7 +99,7 @@ Noise noise;
 float last_x = 0.0f;
 float last_y = 0.0f;
 
-enum class MESH_TYPE: int {
+enum class MESH_TYPE : int {
   TERRAIN,
   SPHERE,
   RANDOM,
@@ -108,7 +108,7 @@ enum class MESH_TYPE: int {
   Count
 };
 
-int mesh_type = (int)MESH_TYPE::TERRAIN;
+int mesh_type = (int) MESH_TYPE::TERRAIN;
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   camera->processMouseMovement(xpos - last_x, last_y - ypos);
@@ -126,8 +126,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     glGetIntegerv(GL_POLYGON_MODE, lastPolyMode);
     if (lastPolyMode[0] == GL_FILL) {
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-    else {
+    } else {
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
   }
@@ -142,7 +141,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
   else if (key == GLFW_KEY_TAB && action == GLFW_RELEASE) {
     mesh_type++;
-    if (mesh_type >= (int)MESH_TYPE::Count) {
+    if (mesh_type >= (int) MESH_TYPE::Count) {
       mesh_type = 0;
     }
     create_chunk();
@@ -156,58 +155,72 @@ MeshData meshData;
 bool bake_ao = true;
 
 void create_chunk() {
-  std::vector<uint8_t> voxels(CS_P3);
-  std::fill(voxels.begin(), voxels.end(), 0);
+  uint8_t* voxels = new uint8_t[CS_P3] { 0 };
+  memset(voxels, 0, CS_P3);
+  memset(meshData.axis_cols, 0, CS_P2 * sizeof(uint64_t));
 
   switch (mesh_type) {
-    case (int)MESH_TYPE::TERRAIN: {
-      noise.generateTerrain(voxels, 30);
-      break;
-    }
+  case (int) MESH_TYPE::TERRAIN:
+  {
+    noise.generateTerrain(voxels, meshData.axis_cols, 30);
+    break;
+  }
 
-    case (int)MESH_TYPE::RANDOM: {
-      noise.generateWhiteNoiseTerrain(voxels, 30);
-      break;
-    }
+  case (int) MESH_TYPE::RANDOM:
+  {
+    noise.generateWhiteNoiseTerrain(voxels, meshData.axis_cols, 30);
+    break;
+  }
 
-    case (int)MESH_TYPE::CHECKERBOARD: {
-      for (int x = 1; x < CS_P; x++) {
-        for (int y = 1; y < CS_P; y++) {
-          for (int z = 1; z < CS_P; z++) {
-            if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
-              voxels.at(get_yzx_index(x, y, z)) = 1;
-              voxels.at(get_yzx_index(x - 1, y - 1, z)) = 2;
-              voxels.at(get_yzx_index(x - 1, y, z - 1)) = 3;
-              voxels.at(get_yzx_index(x, y - 1, z - 1)) = 4;
-            }
+  case (int) MESH_TYPE::CHECKERBOARD:
+  {
+    for (int x = 1; x < CS_P; x++) {
+      for (int y = 1; y < CS_P; y++) {
+        for (int z = 1; z < CS_P; z++) {
+          if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
+            voxels[get_yzx_index(x, y, z)] = 1;
+            meshData.axis_cols[(y * CS_P) + x] |= 1ull << z;
+
+            voxels[get_yzx_index(x - 1, y - 1, z)] = 2;
+            meshData.axis_cols[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
+
+            voxels[get_yzx_index(x - 1, y, z - 1)] = 3;
+            meshData.axis_cols[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
+
+            voxels[get_yzx_index(x, y - 1, z - 1)] = 4;
+            meshData.axis_cols[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
           }
         }
       }
-      break;
     }
+    break;
+  }
 
-    case (int)MESH_TYPE::SPHERE: {
-      int r = CS_P / 2;
-      for (int x = -r; x < r; x++) {
-        for (int y = -r; y < r; y++) {
-          for (int z = -r; z < r; z++) {
-            if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
-              voxels.at(get_yzx_index(x+r, y+r, z+r)) = 1;
-            }
+  case (int) MESH_TYPE::SPHERE:
+  {
+    int r = CS_P / 2;
+    for (int x = -r; x < r; x++) {
+      for (int y = -r; y < r; y++) {
+        for (int z = -r; z < r; z++) {
+          if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
+            voxels[get_yzx_index(x + r, y + r, z + r)] = 1;
+            meshData.axis_cols[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
           }
         }
       }
-      break;
     }
+    break;
+  }
 
-    case (int)MESH_TYPE::EMPTY: {
-      // empty!
-      break;
-    }
+  case (int) MESH_TYPE::EMPTY:
+  {
+    // empty!
+    break;
+  }
   }
 
   {
-    int iterations = 1;
+    int iterations = 1000;
     Timer timer(std::to_string(iterations) + " iterations " + (bake_ao ? "(AO)" : "(No AO)"), true);
 
     for (int i = 0; i < iterations; i++) {
@@ -257,17 +270,15 @@ int main(int argc, char* argv[]) {
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBindVertexArray(VAO);
   glEnableVertexAttribArray(0);
-  glVertexAttribIPointer(0, sizeof(uint32_t), GL_UNSIGNED_INT, sizeof(uint32_t), (void*)0);
+  glVertexAttribIPointer(0, sizeof(uint32_t), GL_UNSIGNED_INT, sizeof(uint32_t), (void*) 0);
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+  meshData.axis_cols = new uint64_t[CS_P2] { 0 };
+  meshData.col_face_masks = new uint64_t[CS_2 * 6] { 0 };
+
   meshData.vertices = new std::vector<uint32_t>(10000);
   meshData.maxVertices = 10000;
-  meshData.col_face_masks = new std::vector<uint64_t>(CS_P2 * 6);
-  meshData.a_axis_cols = new std::vector<uint64_t>(CS_P2);
-  meshData.b_axis_cols = new std::vector<uint64_t>(CS_P);
-  meshData.merged_right = new std::vector<uint64_t>(CS_P);
-  meshData.merged_forward = new std::vector<uint64_t>(CS_P2);
 
   create_chunk();
 
