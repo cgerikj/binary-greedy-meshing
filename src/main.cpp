@@ -9,6 +9,7 @@
 #include "misc/utility.h"
 #include "misc/timer.h"
 
+#define BM_IMPLEMENTATION
 #include "mesher.h"
 
 void create_chunk();

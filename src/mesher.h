@@ -22,15 +22,84 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+//   Define BM_IMPLEMENTATION in exactly one source file to include the implementation
+//   and include the mesher.h without that define as often as needed
+//
+//   it could look like this
+//
+//   #define BM_IMPLEMENTATION
+//   #include "mesher.h"
+//
+//   There are other defines to control the behaviour of the library.
+//   * Define BM_IVEC2 with your own vector implementation - otherwise it will use glm::ivec2
+//   * Define BM_VECTOR with your own vector implementation - otherwise it will use std::vector
+
 #ifndef MESHER_H
 #define MESHER_H
 
+#ifndef BM_IVEC2
 #include <glm/glm.hpp>
-#include <vector>
-#include <stdint.h>
-#include <string.h> // memset
+#define BM_IVEC2 glm::ivec2
+#endif
 
-#include "constants.h"
+#ifndef BM_VECTOR
+#include <vector>
+#define BM_VECTOR std::vector
+#endif
+
+#include <stdint.h>
+
+// CS = chunk size (max 62)
+static constexpr int CS = 62;
+
+// Padded chunk size
+static constexpr int CS_P = CS + 2;
+static constexpr int CS_2 = CS * CS;
+static constexpr int CS_P2 = CS_P * CS_P;
+static constexpr int CS_P3 = CS_P * CS_P * CS_P;
+
+struct MeshData {
+  BM_VECTOR<uint64_t>* col_face_masks = nullptr; // CS_P2 * 6
+  BM_VECTOR<uint64_t>* a_axis_cols = nullptr; // CS_P2
+  BM_VECTOR<uint64_t>* b_axis_cols = nullptr; // CS_P
+  BM_VECTOR<uint64_t>* merged_right = nullptr; // CS_P
+  BM_VECTOR<uint64_t>* merged_forward = nullptr; // CS_P2
+
+  // Vertex data is packed into one unsigned integer:
+  // - x, y, z: 6 bit each (0-63)
+  // - Type: 8 bit (0-255)
+  // - Normal: 3 bit (0-5)
+  // - AO: 2 bit
+  //
+  // Meshes can be offset to world space using a per-draw uniform or by packing xyz
+  // in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
+  BM_VECTOR<uint32_t>* vertices = nullptr;
+  int vertexCount = 0;
+  int maxVertices = 0;
+};
+
+// voxels - 64^3 (includes neighboring voxels)
+// vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
+// vertexLength - output  number of vertices to read from vertices
+//
+// @param[in] voxels The input data includes duplicate edge data from neighboring chunks which is used
+// for visibility culling and AO. For optimal performance, your world data should already be structured
+// this way so that you can feed the data straight into this algorithm.
+// Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh.
+//
+// @param[out] meshData The allocated vertices in MeshData with a length of meshData.vertexCount.
+//
+// @param[in] bake_ao true if you want baked ambient occlusion.
+void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao = true);
+
+#endif // MESHER_H
+
+#ifdef BM_IMPLEMENTATION
+
+#ifndef BM_MEMSET
+#define BM_MEMSET memset
+#include <string.h> // memset
+#endif
 
 static inline const int get_axis_i(const int axis, const int a, const int b, const int c) {
   if (axis == 0) return b + (a * CS_P) + (c * CS_P2);
@@ -43,22 +112,22 @@ static inline const bool solid_check(int voxel) {
   return voxel > 0;
 }
 
-static const glm::ivec2 ao_dirs[8] = {
-  glm::ivec2(-1, 0),
-   glm::ivec2(0, -1),
-   glm::ivec2(0, 1),
-   glm::ivec2(1, 0),
-   glm::ivec2(-1, -1),
-   glm::ivec2(-1, 1),
-   glm::ivec2(1, -1),
-   glm::ivec2(1, 1),
+static const BM_IVEC2 ao_dirs[8] = {
+  BM_IVEC2(-1, 0),
+  BM_IVEC2(0, -1),
+  BM_IVEC2(0, 1),
+  BM_IVEC2(1, 0),
+  BM_IVEC2(-1, -1),
+  BM_IVEC2(-1, 1),
+  BM_IVEC2(1, -1),
+  BM_IVEC2(1, 1),
 };
 
 static inline const int vertexAO(uint8_t side1, uint8_t side2, uint8_t corner) {
   return (side1 && side2) ? 0 : (3 - (side1 + side2 + corner));
 }
 
-static inline const bool compare_ao(const std::vector<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
+static inline const bool compare_ao(const BM_VECTOR<uint8_t>& voxels, int axis, int forward, int right, int c, int forward_offset, int right_offset) {
   for (auto& ao_dir : ao_dirs) {
     if (solid_check(voxels[get_axis_i(axis, right + ao_dir[0], forward + ao_dir[1], c)]) !=
       solid_check(voxels[get_axis_i(axis, right + right_offset + ao_dir[0], forward + forward_offset + ao_dir[1], c)])
@@ -69,7 +138,7 @@ static inline const bool compare_ao(const std::vector<uint8_t>& voxels, int axis
   return true;
 }
 
-static inline const void insert_quad(std::vector<uint32_t>& vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped, int& vertexI, int& maxVertices) {
+static inline const void insert_quad(BM_VECTOR<uint32_t>& vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, bool flipped, int& vertexI, int& maxVertices) {
   if (vertexI >= maxVertices - 6) {
     vertices.resize(maxVertices * 2, 0);
     maxVertices *= 2;
@@ -102,39 +171,7 @@ static inline const uint32_t get_vertex(uint32_t x, uint32_t y, uint32_t z, uint
 static const uint64_t CULL_MASK = (1ULL << (CS_P - 1));
 static const uint64_t BORDER_MASK = (1ULL | (1ULL <<  (CS_P - 1)));
 
-struct MeshData {
-  std::vector<uint64_t>* col_face_masks = nullptr; // CS_P2 * 6
-  std::vector<uint64_t>* a_axis_cols = nullptr; // CS_P2
-  std::vector<uint64_t>* b_axis_cols = nullptr; // CS_P
-  std::vector<uint64_t>* merged_right = nullptr; // CS_P
-  std::vector<uint64_t>* merged_forward = nullptr; // CS_P2
-
-  // Vertex data is packed into one unsigned integer:
-  // - x, y, z: 6 bit each (0-63)
-  // - Type: 8 bit (0-255)
-  // - Normal: 3 bit (0-5)
-  // - AO: 2 bit
-  //
-  // Meshes can be offset to world space using a per-draw uniform or by packing xyz
-  // in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
-  std::vector<uint32_t>* vertices = nullptr;
-  int vertexCount = 0;
-  int maxVertices = 0;
-};
-
-// voxels - 64^3 (includes neighboring voxels)
-// vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
-// vertexLength - output  number of vertices to read from vertices
-//
-// @param[in] voxels The input data includes duplicate edge data from neighboring chunks which is used
-// for visibility culling and AO. For optimal performance, your world data should already be structured
-// this way so that you can feed the data straight into this algorithm.
-// Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh.
-//
-// @param[out] meshData The allocated vertices in MeshData with a length of meshData.vertexCount.
-//
-// @param[in] bake_ao true if you want baked ambient occlusion.
-void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
+void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
   meshData.vertexCount = 0;
   int vertexI = 0;
 
@@ -146,9 +183,9 @@ void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) 
 
   // Begin culling faces
   auto p = voxels.begin();
-  memset(a_axis_cols.data(), 0, CS_P2);
+  BM_MEMSET(a_axis_cols.data(), 0, CS_P2);
   for (int a = 0; a < CS_P; a++) {
-    memset(b_axis_cols.data(), 0, CS_P * 8);
+    BM_MEMSET(b_axis_cols.data(), 0, CS_P * 8);
 
     for (int b = 0; b < CS_P; b++) {
       uint64_t cb = 0;
@@ -192,13 +229,13 @@ void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) 
     int axis = face / 2;
     int air_dir = face % 2 == 0 ? 1 : -1;
 
-    memset(merged_forward.data(), 0, CS_P2 * 8);
+    BM_MEMSET(merged_forward.data(), 0, CS_P2 * 8);
 
     for (int forward = 1; forward < CS_P - 1; forward++) {
       uint64_t bits_walking_right = 0;
       int forwardIndex = (forward * CS_P) + (face * CS_P2);
 
-      memset(merged_right.data(), 0, CS_P * 8);
+      BM_MEMSET(merged_right.data(), 0, CS_P * 8);
 
       for (int right = 1; right < CS_P - 1; right++) {
         int rightxCS_P = right * CS_P;
@@ -333,5 +370,4 @@ void mesh(const std::vector<uint8_t>& voxels, MeshData& meshData, bool bake_ao) 
 
   meshData.vertexCount = vertexI + 1;
 }
-
-#endif
+#endif // BM_IMPLEMENTATION
