@@ -148,7 +148,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   }
 }
 
-GLuint VAO, VBO;
+GLuint VAO, IBO, SSBO;
 
 MeshData meshData;
 
@@ -227,11 +227,11 @@ void create_chunk() {
   }
 
   if (meshData.vertexCount) {
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, meshData.vertexCount * sizeof(uint32_t), meshData.vertices->data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    glNamedBufferStorage(SSBO,
+      sizeof(uint32_t) * meshData.vertexCount,
+      (const void *)meshData.vertices->data(), 
+      GL_DYNAMIC_STORAGE_BIT
+    );
   }
 
   printf("vertex count: %i\n", meshData.vertexCount);
@@ -261,14 +261,17 @@ int main(int argc, char* argv[]) {
   }
 
   glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBindVertexArray(VAO);
-  glEnableVertexAttribArray(0);
-  glVertexAttribIPointer(0, sizeof(uint32_t), GL_UNSIGNED_INT, sizeof(uint32_t), (void*) 0);
-  glBindVertexArray(0);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glCreateBuffers(1, &SSBO);
+
+  glGenBuffers(1, &IBO);
+  int indicesLength = CS * CS * CS * 6 * 6;
+  std::vector<uint32_t> indices;
+  for (int i = 0; i < indicesLength; i++) {
+    indices.push_back(i);
+  }
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesLength, indices.data(), GL_DYNAMIC_DRAW);
 
   meshData.opaqueMask = new uint64_t[CS_P2] { 0 };
   meshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
@@ -311,8 +314,21 @@ int main(int argc, char* argv[]) {
       shader->setMat4("u_projection", camera->projection);
       shader->setMat4("u_view", camera->getViewMatrix());
       shader->setVec3("eye_position", camera->position);
+
       glBindVertexArray(VAO);
-      glDrawArrays(GL_TRIANGLES, 0, meshData.vertexCount);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBO);
+      glPointSize(10);
+
+      glDrawElements(
+        GL_POINTS,
+        meshData.vertexCount,
+        GL_UNSIGNED_INT,
+        (void*)0
+      );
+
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
       glBindVertexArray(0);
     }
 

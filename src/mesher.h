@@ -101,24 +101,19 @@ static inline const int getAxisIndex(const int axis, const int a, const int b, c
   else return c + (b * CS_P) + (a * CS_P2);
 }
 
-static inline const void insertQuad(BM_VECTOR<uint32_t>& vertices, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, int& vertexI, int& maxVertices) {
+static inline const void insertQuad(BM_VECTOR<uint32_t>& vertices, uint32_t quad, int& vertexI, int& maxVertices) {
   if (vertexI >= maxVertices - 6) {
     vertices.resize(maxVertices * 2, 0);
     maxVertices *= 2;
   }
 
-  vertices[vertexI] = v1;
-  vertices[vertexI + 1] = v2;
-  vertices[vertexI + 2] = v4;
-  vertices[vertexI + 3] = v4;
-  vertices[vertexI + 4] = v2;
-  vertices[vertexI + 5] = v3;
+  vertices[vertexI] = quad;
 
-  vertexI += 6;
+  vertexI++;
 }
 
-static inline const uint32_t getVertex(uint32_t x, uint32_t y, uint32_t z, uint32_t type, uint32_t norm) {
-  return (3u << 29) | (norm << 26) | (type << 18) | (z << 12) | (y << 6) | x;
+static inline const uint32_t getQuad(uint32_t x, uint32_t y, uint32_t z, uint32_t w, uint32_t h) {
+  return (h << 24) | (w << 18) | (z << 12) | (y << 6) | x;
 }
 
 constexpr uint64_t P_MASK = ~(1ull << 63 | 1);
@@ -191,30 +186,18 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           forwardMerged[bitPos] = 0;
           rightMerged = 1;
 
-          uint32_t v1, v2, v3, v4;
+          uint32_t quad;
           if (face == 0) {
-            v1 = getVertex(meshFront, meshUp, meshLeft, type, face);
-            v2 = getVertex(meshFront, meshUp, meshLeft + meshWidth, type, face);
-            v3 = getVertex(meshFront + meshLength, meshUp, meshLeft + meshWidth, type, face);
-            v4 = getVertex(meshFront + meshLength, meshUp, meshLeft, type, face);
+            quad = getQuad(meshFront, meshUp, meshLeft, meshWidth, meshLength);
           } else if (face == 1) {
-            v1 = getVertex(meshFront + meshLength, meshUp, meshLeft + meshWidth, type, face);
-            v2 = getVertex(meshFront, meshUp, meshLeft + meshWidth, type, face);
-            v3 = getVertex(meshFront, meshUp, meshLeft, type, face);
-            v4 = getVertex(meshFront + meshLength, meshUp, meshLeft, type, face);
+            quad = getQuad(meshFront, meshUp, meshLeft, meshWidth, meshLength);
           } else if (face == 2) {
-            v1 = getVertex(meshUp, meshFront + meshLength, meshLeft, type, face);
-            v2 = getVertex(meshUp, meshFront + meshLength, meshLeft + meshWidth, type, face);
-            v3 = getVertex(meshUp, meshFront, meshLeft + meshWidth, type, face);
-            v4 = getVertex(meshUp, meshFront, meshLeft, type, face);
+            quad = getQuad(meshUp, meshFront, meshLeft, meshWidth, meshLength);
           } else if (face == 3) {
-            v1 = getVertex(meshUp, meshFront + meshLength, meshLeft, type, face);
-            v2 = getVertex(meshUp, meshFront, meshLeft, type, face);
-            v3 = getVertex(meshUp, meshFront, meshLeft + meshWidth, type, face);
-            v4 = getVertex(meshUp, meshFront + meshLength, meshLeft + meshWidth, type, face);
+            quad = getQuad(meshUp, meshFront, meshLeft, meshWidth, meshLength);
           }
 
-          insertQuad(*meshData.vertices, v1, v2, v3, v4, vertexI, meshData.maxVertices);
+          insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
         }
       }
     }
@@ -267,20 +250,14 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           forwardMerged[right * CS + (bitPos - 1)] = 0;
           rightMerged[bitPos - 1] = 0;
 
-          uint32_t v1, v2, v3, v4;
+          uint32_t quad;
           if (face == 4) {
-            v1 = getVertex(meshFront + meshLength, meshLeft, meshUp, type, face);
-            v2 = getVertex(meshFront + meshLength, meshLeft + meshWidth, meshUp, type, face);
-            v3 = getVertex(meshFront, meshLeft + meshWidth, meshUp, type, face);
-            v4 = getVertex(meshFront, meshLeft, meshUp, type, face);
+            quad = getQuad(meshFront, meshLeft, meshUp, meshWidth, meshLength);
           } else if (face == 5) {
-            v1 = getVertex(meshFront + meshLength, meshLeft, meshUp, type, face);
-            v2 = getVertex(meshFront, meshLeft, meshUp, type, face);
-            v3 = getVertex(meshFront, meshLeft + meshWidth, meshUp, type, face);
-            v4 = getVertex(meshFront + meshLength, meshLeft + meshWidth, meshUp, type, face);
+            quad = getQuad(meshFront, meshLeft, meshWidth,meshUp, meshLength);
           }
 
-          insertQuad(*meshData.vertices, v1, v2, v3, v4, vertexI, meshData.maxVertices);
+          insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
         }
       }
     }
