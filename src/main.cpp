@@ -77,7 +77,7 @@ bool init_opengl() {
 
   glEnable(GL_DEPTH_TEST);
 
-  glFrontFace(GL_CCW);
+  glFrontFace(GL_CW);
   glCullFace(GL_BACK);
   glEnable(GL_CULL_FACE);
 
@@ -227,10 +227,12 @@ void create_chunk() {
   }
 
   if (meshData.vertexCount) {
-    glNamedBufferStorage(SSBO,
-      sizeof(uint32_t) * meshData.vertexCount,
-      (const void *)meshData.vertices->data(), 
-      GL_DYNAMIC_STORAGE_BIT
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+    glBufferSubData(
+      GL_SHADER_STORAGE_BUFFER,
+      0,
+      meshData.vertexCount * sizeof(uint32_t),
+      meshData.vertices->data()
     );
   }
 
@@ -262,16 +264,23 @@ int main(int argc, char* argv[]) {
 
   glGenVertexArrays(1, &VAO);
   glBindVertexArray(VAO);
-  glCreateBuffers(1, &SSBO);
+  glGenBuffers(1, &SSBO);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+  glBufferStorage(GL_SHADER_STORAGE_BUFFER, 1e8, nullptr, GL_DYNAMIC_STORAGE_BIT);
 
   glGenBuffers(1, &IBO);
-  int indicesLength = CS * CS * CS * 6 * 6;
+  int maxQuads = CS * CS * CS * 6;
   std::vector<uint32_t> indices;
-  for (int i = 0; i < indicesLength; i++) {
-    indices.push_back(i);
+  for (uint32_t i = 0; i < maxQuads; i++) {
+    indices.push_back((i << 2) | 0u);
+    indices.push_back((i << 2) | 1u);
+    indices.push_back((i << 2) | 2u);
+    indices.push_back((i << 2) | 2u);
+    indices.push_back((i << 2) | 3u);
+    indices.push_back((i << 2) | 0u);
   }
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesLength, indices.data(), GL_DYNAMIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size(), indices.data(), GL_DYNAMIC_DRAW);
 
   meshData.opaqueMask = new uint64_t[CS_P2] { 0 };
   meshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
@@ -320,12 +329,18 @@ int main(int argc, char* argv[]) {
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBO);
       glPointSize(10);
 
-      glDrawElements(
-        GL_POINTS,
-        meshData.vertexCount,
-        GL_UNSIGNED_INT,
-        (void*)0
-      );
+      for (int i = 0; i < 6; i++) {
+        if (meshData.faceVertexLength[i]) {
+          shader->setInt("face", i);
+          shader->setInt("quadOffset", meshData.faceVertexBegin[i]);
+          glDrawElements(
+            GL_TRIANGLES,
+            meshData.faceVertexLength[i] * 6,
+            GL_UNSIGNED_INT,
+            (void*)0
+          );
+        }
+      }
 
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

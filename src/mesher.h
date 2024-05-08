@@ -72,6 +72,8 @@ struct MeshData {
   BM_VECTOR<uint32_t>* vertices = nullptr;
   int vertexCount = 0;
   int maxVertices = 0;
+  uint32_t faceVertexBegin[6] = { 0 };
+  uint32_t faceVertexLength[6] = { 0 };
 };
 
 // voxels - 64^3 (includes neighboring voxels)
@@ -146,6 +148,8 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
   for (int face = 0; face < 4; face++) {
     int axis = face / 2;
 
+    uint32_t faceVertexBegin = vertexI;
+
     for (int layer = 0; layer < CS; layer++) {
       int bitsLocation = layer * CS + face * CS_2;
       for (int forward = 0; forward < CS; forward++) {
@@ -188,25 +192,33 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
           uint32_t quad;
           if (face == 0) {
-            quad = getQuad(meshFront, meshUp, meshLeft, meshWidth, meshLength);
+            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth);
+            insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
           } else if (face == 1) {
-            quad = getQuad(meshFront, meshUp, meshLeft, meshWidth, meshLength);
+            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth);
+            insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
           } else if (face == 2) {
-            quad = getQuad(meshUp, meshFront, meshLeft, meshWidth, meshLength);
+            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth);
+            insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
           } else if (face == 3) {
-            quad = getQuad(meshUp, meshFront, meshLeft, meshWidth, meshLength);
+            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth);
+            insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
           }
-
-          insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
         }
       }
     }
+
+    uint32_t faceVertexLength = vertexI - faceVertexBegin;
+    meshData.faceVertexBegin[face] = faceVertexBegin;
+    meshData.faceVertexLength[face] =faceVertexLength;
   }
 
   //Greedy meshing faces 4-5
   uint8_t rightMerged[CS] { 0 };
   for (int face = 4; face < 6; face++) {
     int axis = face / 2;
+
+    uint32_t faceVertexBegin = vertexI;
 
     for (int forward = 0; forward < CS; forward++) {
       int bitsLocation = forward * CS + face * CS_2;
@@ -252,15 +264,19 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
           uint32_t quad;
           if (face == 4) {
-            quad = getQuad(meshFront, meshLeft, meshUp, meshWidth, meshLength);
+            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth);
+            insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
           } else if (face == 5) {
-            quad = getQuad(meshFront, meshLeft, meshWidth,meshUp, meshLength);
+            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth);
+            insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
           }
-
-          insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
         }
       }
     }
+  
+    uint32_t faceVertexLength = vertexI - faceVertexBegin;
+    meshData.faceVertexBegin[face] = faceVertexBegin;
+    meshData.faceVertexLength[face] =faceVertexLength;
   }
 
   meshData.vertexCount = vertexI + 1;
