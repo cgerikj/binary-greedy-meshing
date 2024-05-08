@@ -1,7 +1,12 @@
 #version 430 core
 
+struct QuadData {
+  uint quadData1;
+  uint quadData2;
+};
+
 layout(binding = 0, std430) readonly buffer ssbo1 {
-    uint data[];  
+  QuadData data[];  
 };
 
 uniform mat4 u_view;
@@ -28,7 +33,8 @@ void main() {
   int quadIndex = int(gl_VertexID&3u);
   uint ssboIndex = quadOffset + (gl_VertexID >> 2u);
 
-  uint quadData1 = data[ssboIndex];
+  uint quadData1 = data[ssboIndex].quadData1;
+  uint quadData2 = data[ssboIndex].quadData2;
 
   float x = float(quadData1&63u);
   float y = float((quadData1 >> 6u)&63u);
@@ -36,6 +42,8 @@ void main() {
 
   float w = float((quadData1 >> 18u)&63u);
   float h = float((quadData1 >> 24u)&63u);
+
+  uint type = quadData2&255u;
 
   // TODO
   /*
@@ -142,7 +150,7 @@ void main() {
   frag_pos -= vec3(0.5);
   frag_viewspace = u_view * vec4(frag_pos, 1);
   frag_normal = NORMALS[face];
-  frag_type = 1;
+  frag_type = type;
   
   gl_Position = u_projection * frag_viewspace;
 }

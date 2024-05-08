@@ -69,7 +69,7 @@ struct MeshData {
   //
   // Meshes can be offset to world space using a per-draw uniform or by packing xyz
   // in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
-  BM_VECTOR<uint32_t>* vertices = nullptr;
+  BM_VECTOR<uint64_t>* vertices = nullptr;
   int vertexCount = 0;
   int maxVertices = 0;
   int faceVertexBegin[6] = { 0 };
@@ -103,7 +103,7 @@ static inline const int getAxisIndex(const int axis, const int a, const int b, c
   else return c + (b * CS_P) + (a * CS_P2);
 }
 
-static inline const void insertQuad(BM_VECTOR<uint32_t>& vertices, uint32_t quad, int& vertexI, int& maxVertices) {
+static inline const void insertQuad(BM_VECTOR<uint64_t>& vertices, uint64_t quad, int& vertexI, int& maxVertices) {
   if (vertexI >= maxVertices - 6) {
     vertices.resize(maxVertices * 2, 0);
     maxVertices *= 2;
@@ -114,8 +114,8 @@ static inline const void insertQuad(BM_VECTOR<uint32_t>& vertices, uint32_t quad
   vertexI++;
 }
 
-static inline const uint32_t getQuad(uint32_t x, uint32_t y, uint32_t z, uint32_t w, uint32_t h) {
-  return (h << 24) | (w << 18) | (z << 12) | (y << 6) | x;
+static inline const uint64_t getQuad(uint64_t x, uint64_t y, uint64_t z, uint64_t w, uint64_t h, uint64_t type) {
+  return (type << 32) | (h << 24) | (w << 18) | (z << 12) | (y << 6) | x;
 }
 
 constexpr uint64_t P_MASK = ~(1ull << 63 | 1);
@@ -190,15 +190,15 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           forwardMerged[bitPos] = 0;
           rightMerged = 1;
 
-          uint32_t quad;
+          uint64_t quad;
           if (face == 0) {
-            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth);
+            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth, type);
           } else if (face == 1) {
-            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth);
+            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth, type);
           } else if (face == 2) {
-            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth);
+            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth, type);
           } else if (face == 3) {
-            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth);
+            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth, type);
           }
 
           insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
@@ -260,11 +260,11 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           forwardMerged[right * CS + (bitPos - 1)] = 0;
           rightMerged[bitPos - 1] = 0;
 
-          uint32_t quad;
+          uint64_t quad;
           if (face == 4) {
-            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth);
+            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth, type);
           } else if (face == 5) {
-            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth);
+            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth, type);
           }
 
           insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
