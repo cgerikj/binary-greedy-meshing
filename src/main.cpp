@@ -152,23 +152,21 @@ GLuint VAO, VBO;
 
 MeshData meshData;
 
-bool bake_ao = true;
-
 void create_chunk() {
   uint8_t* voxels = new uint8_t[CS_P3] { 0 };
   memset(voxels, 0, CS_P3);
-  memset(meshData.axis_cols, 0, CS_P2 * sizeof(uint64_t));
+  memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
 
   switch (mesh_type) {
   case (int) MESH_TYPE::TERRAIN:
   {
-    noise.generateTerrain(voxels, meshData.axis_cols, 30);
+    noise.generateTerrain(voxels, meshData.opaqueMask, 30);
     break;
   }
 
   case (int) MESH_TYPE::RANDOM:
   {
-    noise.generateWhiteNoiseTerrain(voxels, meshData.axis_cols, 30);
+    noise.generateWhiteNoiseTerrain(voxels, meshData.opaqueMask, 30);
     break;
   }
 
@@ -179,16 +177,16 @@ void create_chunk() {
         for (int z = 1; z < CS_P; z++) {
           if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
             voxels[get_yzx_index(x, y, z)] = 1;
-            meshData.axis_cols[(y * CS_P) + x] |= 1ull << z;
+            meshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
             voxels[get_yzx_index(x - 1, y - 1, z)] = 2;
-            meshData.axis_cols[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
+            meshData.opaqueMask[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
 
             voxels[get_yzx_index(x - 1, y, z - 1)] = 3;
-            meshData.axis_cols[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
+            meshData.opaqueMask[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
 
             voxels[get_yzx_index(x, y - 1, z - 1)] = 4;
-            meshData.axis_cols[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
+            meshData.opaqueMask[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
           }
         }
       }
@@ -204,7 +202,7 @@ void create_chunk() {
         for (int z = -r; z < r; z++) {
           if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
             voxels[get_yzx_index(x + r, y + r, z + r)] = 1;
-            meshData.axis_cols[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
+            meshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
           }
         }
       }
@@ -221,13 +219,11 @@ void create_chunk() {
 
   {
     int iterations = 1000;
-    Timer timer(std::to_string(iterations) + " iterations " + (bake_ao ? "(AO)" : "(No AO)"), true);
+    Timer timer(std::to_string(iterations) + " iterations", true);
 
     for (int i = 0; i < iterations; i++) {
-      mesh(voxels, meshData, bake_ao);
+      mesh(voxels, meshData);
     }
-
-    bake_ao = !bake_ao;
   }
 
   if (meshData.vertexCount) {
@@ -274,8 +270,8 @@ int main(int argc, char* argv[]) {
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  meshData.axis_cols = new uint64_t[CS_P2] { 0 };
-  meshData.col_face_masks = new uint64_t[CS_2 * 6] { 0 };
+  meshData.opaqueMask = new uint64_t[CS_P2] { 0 };
+  meshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
 
   meshData.vertices = new std::vector<uint32_t>(10000);
   meshData.maxVertices = 10000;

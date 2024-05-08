@@ -15,7 +15,7 @@ public:
     noise.SetFractalLacunarity(2.0);
   }
 
-  void generateTerrain(uint8_t* voxels, uint64_t* axis_cols, int seed) {
+  void generateTerrain(uint8_t* voxels, uint64_t* opaqueMask, int seed) {
     noise.SetSeed(seed);
 
     for (int x = 0; x < CS_P; x++) {
@@ -27,7 +27,7 @@ public:
             int i = get_yzx_index(x, y, z);
             int i_above = get_yzx_index(x, y + 1, z);
 
-            axis_cols[(y * CS_P) + x] |= 1ull << z;
+            opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
             switch (voxels[i_above]) {
             case 0:
@@ -43,7 +43,7 @@ public:
     }
   }
 
-  void generateWhiteNoiseTerrain(uint8_t* voxels, uint64_t* axis_cols, int seed) {
+  void generateWhiteNoiseTerrain(uint8_t* voxels, uint64_t* opaqueMask, int seed) {
     whiteNoise.SetSeed(seed);
 
     for (int x = 1; x < CS_P; x++) {
@@ -52,7 +52,7 @@ public:
           float noise = (whiteNoise.GetWhiteNoise(x, y, z));
           int i = get_yzx_index(x, y, z);
 
-          if (noise > 0.5f) axis_cols[(y * CS_P) + x] |= 1ull << z;
+          if (noise > 0.5f) opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
           if (noise > 0.8f) {
             voxels[i] = 1;
