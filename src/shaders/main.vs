@@ -15,18 +15,28 @@ uniform mat4 u_projection;
 uniform int face;
 uniform int quadOffset;
 
-out vec4 frag_viewspace;
-out vec3 frag_pos;
-out vec3 frag_normal;
-flat out uint frag_type;
+out VS_OUT {
+  out vec3 pos;
+  flat vec3 normal;
+  flat vec3 color;
+} vs_out;
 
-uniform vec3 NORMALS[6] = {
+const vec3 normalLookup[6] = {
   vec3( 0, 1, 0 ),
   vec3(0, -1, 0 ),
   vec3( 1, 0, 0 ),
   vec3( -1, 0, 0 ),
   vec3( 0, 0, 1 ),
   vec3( 0, 0, -1 )
+};
+
+const vec3 colorLookup[6] = {
+  vec3(0.6, 0.1, 0.1),
+  vec3(0.1, 0.6, 0.1),
+  vec3(0.1, 0.1, 0.6),
+  vec3(0.1, 0.6, 0.6),
+  vec3(0.6, 0.1, 0.6),
+  vec3(0.6, 0.6, 0.1)
 };
 
 const int flipLookup[6] = int[6](1, -1, -1, 1, -1, 1);
@@ -48,16 +58,12 @@ void main() {
   int wDir = (face & 2) >> 1, hDir = 2 - (face >> 2);
   int wMod = quadIndex >> 1, hMod = quadIndex & 1;
 
-  frag_pos = vec3(x, y, z);
-  frag_pos[wDir] += w * wMod * flipLookup[face];
-  frag_pos[hDir] += h * hMod;
+  vs_out.pos = vec3(x, y, z);
+  vs_out.pos[wDir] += w * wMod * flipLookup[face];
+  vs_out.pos[hDir] += h * hMod;
 
-  uint type = quadData2&255u;
-
-  frag_pos -= vec3(0.5);
-  frag_viewspace = u_view * vec4(frag_pos, 1);
-  frag_normal = NORMALS[face];
-  frag_type = type;
+  vs_out.normal = normalLookup[face];
+  vs_out.color = colorLookup[(quadData2&255u) - 1];
   
-  gl_Position = u_projection * frag_viewspace;
+  gl_Position = u_projection * u_view * vec4(vs_out.pos, 1);
 }
