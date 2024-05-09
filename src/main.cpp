@@ -16,7 +16,7 @@ void create_chunk();
 
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SAMPLES, 4);
 
@@ -148,7 +148,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   }
 }
 
-GLuint VAO, VBO;
+GLuint VAO, IBO, SSBO;
 
 MeshData meshData;
 
@@ -227,11 +227,13 @@ void create_chunk() {
   }
 
   if (meshData.vertexCount) {
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, meshData.vertexCount * sizeof(uint32_t), meshData.vertices->data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+    glBufferSubData(
+      GL_SHADER_STORAGE_BUFFER,
+      0,
+      meshData.vertexCount * sizeof(uint64_t),
+      meshData.vertices->data()
+    );
   }
 
   printf("vertex count: %i\n", meshData.vertexCount);
@@ -261,19 +263,29 @@ int main(int argc, char* argv[]) {
   }
 
   glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBindVertexArray(VAO);
-  glEnableVertexAttribArray(0);
-  glVertexAttribIPointer(0, sizeof(uint32_t), GL_UNSIGNED_INT, sizeof(uint32_t), (void*) 0);
-  glBindVertexArray(0);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glGenBuffers(1, &SSBO);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+  glBufferStorage(GL_SHADER_STORAGE_BUFFER, 1e8, nullptr, GL_DYNAMIC_STORAGE_BIT);
+
+  glGenBuffers(1, &IBO);
+  int maxQuads = CS * CS * CS * 6;
+  std::vector<uint32_t> indices;
+  for (uint32_t i = 0; i < maxQuads; i++) {
+    indices.push_back((i << 2) | 2u);
+    indices.push_back((i << 2) | 0u);
+    indices.push_back((i << 2) | 1u);
+    indices.push_back((i << 2) | 1u);
+    indices.push_back((i << 2) | 3u);
+    indices.push_back((i << 2) | 2u);
+  }
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size(), indices.data(), GL_DYNAMIC_DRAW);
 
   meshData.opaqueMask = new uint64_t[CS_P2] { 0 };
   meshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
 
-  meshData.vertices = new std::vector<uint32_t>(10000);
+  meshData.vertices = new std::vector<uint64_t>(10000);
   meshData.maxVertices = 10000;
 
   create_chunk();
@@ -311,8 +323,27 @@ int main(int argc, char* argv[]) {
       shader->setMat4("u_projection", camera->projection);
       shader->setMat4("u_view", camera->getViewMatrix());
       shader->setVec3("eye_position", camera->position);
+
       glBindVertexArray(VAO);
-      glDrawArrays(GL_TRIANGLES, 0, meshData.vertexCount);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBO);
+      glPointSize(10);
+
+      for (int i = 0; i < 6; i++) {
+        if (meshData.faceVertexLength[i]) {
+          shader->setInt("face", i);
+          shader->setInt("quadOffset", meshData.faceVertexBegin[i]);
+          glDrawElements(
+            GL_TRIANGLES,
+            meshData.faceVertexLength[i] * 6,
+            GL_UNSIGNED_INT,
+            (void*)0
+          );
+        }
+      }
+
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
       glBindVertexArray(0);
     }
 
