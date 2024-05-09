@@ -191,14 +191,15 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           rightMerged = 1;
 
           uint64_t quad;
-          if (face == 0) {
-            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth, type);
-          } else if (face == 1) {
-            quad = getQuad(meshFront, meshUp, meshLeft, meshLength, meshWidth, type);
-          } else if (face == 2) {
-            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth, type);
-          } else if (face == 3) {
-            quad = getQuad(meshUp, meshFront, meshLeft, meshLength, meshWidth, type);
+          switch (face) {
+          case 0:
+          case 1:
+            quad = getQuad(meshFront + (face == 1 ? meshLength : 0), meshUp, meshLeft, meshLength, meshWidth, type);
+            break;
+          case 2:
+          case 3:
+            quad = getQuad(meshUp, meshFront + (face == 2 ? meshLength : 0), meshLeft, meshLength, meshWidth, type);
+            break;
           }
 
           insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
@@ -260,12 +261,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           forwardMerged[right * CS + (bitPos - 1)] = 0;
           rightMerged[bitPos - 1] = 0;
 
-          uint64_t quad;
-          if (face == 4) {
-            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth, type);
-          } else if (face == 5) {
-            quad = getQuad(meshFront, meshLeft, meshUp, meshLength, meshWidth, type);
-          }
+          uint64_t quad = getQuad(meshFront + (face == 4 ? meshLength : 0), meshLeft, meshUp, meshLength, meshWidth, type);
 
           insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
         }

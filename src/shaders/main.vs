@@ -29,6 +29,8 @@ uniform vec3 NORMALS[6] = {
   vec3( 0, 0, -1 )
 };
 
+const int flipLookup[6] = int[6](1, -1, -1, 1, -1, 1);
+
 void main() {
   int quadIndex = int(gl_VertexID&3u);
   uint ssboIndex = quadOffset + (gl_VertexID >> 2u);
@@ -43,109 +45,14 @@ void main() {
   float w = float((quadData1 >> 18u)&63u);
   float h = float((quadData1 >> 24u)&63u);
 
-  uint type = quadData2&255u;
+  int wDir = (face & 2) >> 1, hDir = 2 - (face >> 2);
+  int wMod = quadIndex >> 1, hMod = quadIndex & 1;
 
-  // TODO
-  /*
   frag_pos = vec3(x, y, z);
+  frag_pos[wDir] += w * wMod * flipLookup[face];
+  frag_pos[hDir] += h * hMod;
 
-  int wDir = ~face & 2, lDir = (~face >> 2) & 1;
-  int wMod = vertexID >> 1, lMod = vertexID & 1;
-  int quadWidth = int((quadData1 >> 18u) & 63u);
-  int quadLength = int((quadData1 >> 24u) & 63u);
-
-  frag_pos[wDir] += quadWidth * wMod;
-  frag_pos[lDir] += quadLength * lMod;
-  */
-
-  if (face == 0) {
-    if (quadIndex == 0) {
-      frag_pos = vec3(x, y, z);
-    }
-    else if (quadIndex == 1) {
-      frag_pos = vec3(x + w, y, z);
-    }
-    else if (quadIndex == 2) {
-      frag_pos = vec3(x + w, y, z + h);
-    }
-    else if (quadIndex == 3) {
-      frag_pos = vec3(x, y, z + h);
-    }
-  }
-  else if (face == 1) {
-    if (quadIndex == 3) {
-      frag_pos = vec3(x, y, z);
-    }
-    else if (quadIndex == 2) {
-      frag_pos = vec3(x + w, y, z);
-    }
-    else if (quadIndex == 1) {
-      frag_pos = vec3(x + w, y, z + h);
-    }
-    else if (quadIndex == 0) {
-      frag_pos = vec3(x, y, z + h);
-    }
-  }
-
-  else if (face == 2) {
-    if (quadIndex == 3) {
-      frag_pos = vec3(x, y, z);
-    }
-    else if (quadIndex == 2) {
-      frag_pos = vec3(x, y + w, z);
-    }
-    else if (quadIndex == 1) {
-      frag_pos = vec3(x, y + w, z + h);
-    }
-    else if (quadIndex == 0) {
-      frag_pos = vec3(x, y, z + h);
-    }
-  }
-
-  else if (face == 3) {
-    if (quadIndex == 0) {
-      frag_pos = vec3(x, y, z);
-    }
-    else if (quadIndex == 1) {
-      frag_pos = vec3(x, y + w, z);
-    }
-    else if (quadIndex == 2) {
-      frag_pos = vec3(x, y + w, z + h);
-    }
-    else if (quadIndex == 3) {
-      frag_pos = vec3(x, y, z + h);
-    }
-  }
-
-  else if (face == 4) {
-    if (quadIndex == 3) {
-      frag_pos = vec3(x, y, z);
-    }
-    else if (quadIndex == 2) {
-      frag_pos = vec3(x + w, y, z);
-    }
-    else if (quadIndex == 1) {
-      frag_pos = vec3(x + w, y + h, z);
-    }
-    else if (quadIndex == 0) {
-      frag_pos = vec3(x, y + h, z);
-    }
-  }
-
-  else if (face == 5) {
-    if (quadIndex == 0) {
-      frag_pos = vec3(x, y, z);
-    }
-    else if (quadIndex == 1) {
-      frag_pos = vec3(x + w, y, z);
-    }
-    else if (quadIndex == 2) {
-      frag_pos = vec3(x + w, y + h, z);
-    }
-    else if (quadIndex == 3) {
-      frag_pos = vec3(x, y + h, z);
-    }
-  }
+  uint type = quadData2&255u;
 
   frag_pos -= vec3(0.5);
   frag_viewspace = u_view * vec4(frag_pos, 1);
