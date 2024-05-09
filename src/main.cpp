@@ -8,6 +8,7 @@
 #include "misc/noise.h"
 #include "misc/utility.h"
 #include "misc/timer.h"
+#include "rendering/chunk_renderer.h"
 
 #define BM_IMPLEMENTATION
 #include "mesher.h"
@@ -110,6 +111,10 @@ enum class MESH_TYPE : int {
 
 int mesh_type = (int) MESH_TYPE::TERRAIN;
 
+MeshData meshData;
+ChunkRenderer chunkRenderer;
+std::vector<DrawElementsIndirectCommand*> drawCommands;
+
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   camera->processMouseMovement(xpos - last_x, last_y - ypos);
   last_x = xpos;
@@ -136,7 +141,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   }
 
   else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
-    create_chunk();
+    // create_chunk();
   }
 
   else if (key == GLFW_KEY_TAB && action == GLFW_RELEASE) {
@@ -144,13 +149,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (mesh_type >= (int) MESH_TYPE::Count) {
       mesh_type = 0;
     }
-    create_chunk();
+    // create_chunk();
   }
 }
-
-GLuint VAO, IBO, SSBO;
-
-MeshData meshData;
 
 void create_chunk() {
   uint8_t* voxels = new uint8_t[CS_P3] { 0 };
@@ -160,7 +161,7 @@ void create_chunk() {
   switch (mesh_type) {
   case (int) MESH_TYPE::TERRAIN:
   {
-    noise.generateTerrain(voxels, meshData.opaqueMask, 30);
+    // noise.generateTerrain(voxels, meshData.opaqueMask, 30);
     break;
   }
 
@@ -218,7 +219,7 @@ void create_chunk() {
   }
 
   {
-    int iterations = 1000;
+    int iterations = 1;
     Timer timer(std::to_string(iterations) + " iterations", true);
 
     for (int i = 0; i < iterations; i++) {
@@ -227,13 +228,9 @@ void create_chunk() {
   }
 
   if (meshData.vertexCount) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
-    glBufferSubData(
-      GL_SHADER_STORAGE_BUFFER,
-      0,
-      meshData.vertexCount * sizeof(uint64_t),
-      meshData.vertices->data()
-    );
+    //auto drawCommand = chunkRenderer.getDrawCommand(meshData.vertexCount, 0);
+    //chunkRenderer.buffer(*drawCommand, meshData.vertices->data());
+    //drawCommands.push_back(drawCommand);
   }
 
   printf("vertex count: %i\n", meshData.vertexCount);
@@ -262,33 +259,42 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  glGenVertexArrays(1, &VAO);
-  glBindVertexArray(VAO);
-  glGenBuffers(1, &SSBO);
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
-  glBufferStorage(GL_SHADER_STORAGE_BUFFER, 1e8, nullptr, GL_DYNAMIC_STORAGE_BIT);
-
-  glGenBuffers(1, &IBO);
-  int maxQuads = CS * CS * CS * 6;
-  std::vector<uint32_t> indices;
-  for (uint32_t i = 0; i < maxQuads; i++) {
-    indices.push_back((i << 2) | 2u);
-    indices.push_back((i << 2) | 0u);
-    indices.push_back((i << 2) | 1u);
-    indices.push_back((i << 2) | 1u);
-    indices.push_back((i << 2) | 3u);
-    indices.push_back((i << 2) | 2u);
-  }
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size(), indices.data(), GL_DYNAMIC_DRAW);
-
   meshData.opaqueMask = new uint64_t[CS_P2] { 0 };
   meshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
 
   meshData.vertices = new std::vector<uint64_t>(10000);
   meshData.maxVertices = 10000;
 
-  create_chunk();
+  chunkRenderer.init();
+
+  // create_chunk();
+
+  uint8_t* voxels = new uint8_t[CS_P3] { 0 };
+
+  for (uint32_t x = 0; x < 5; x++) {
+    for (uint32_t z = 0; z < 5; z++) {
+      memset(voxels, 0, CS_P3);
+      memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+
+      noise.generateTerrain(voxels, meshData.opaqueMask, 30, x, z);
+
+      mesh(voxels, meshData);
+
+      if (meshData.vertexCount) {
+        for (uint32_t i = 0; i <= 5; i++) {
+          if (meshData.faceVertexLength[i]) {
+            uint32_t y = 0;
+            uint32_t baseInstance = (i << 24) | (z << 16) | (y << 8) | x;
+
+            auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
+            drawCommands.push_back(drawCommand);
+
+            chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
+          }
+        }
+      }
+    }
+  }
 
   shader = new Shader("main", "main");
   camera = new Camera(glm::vec3(31, 65, -5));
@@ -318,34 +324,11 @@ int main(int argc, char* argv[]) {
     auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
     camera->position += noclipSpeed * wishdir * deltaTime;
 
-    if (meshData.vertexCount > 0) {
-      shader->use();
-      shader->setMat4("u_projection", camera->projection);
-      shader->setMat4("u_view", camera->getViewMatrix());
-      shader->setVec3("eye_position", camera->position);
-
-      glBindVertexArray(VAO);
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBO);
-      glPointSize(10);
-
-      for (int i = 0; i < 6; i++) {
-        if (meshData.faceVertexLength[i]) {
-          shader->setInt("face", i);
-          shader->setInt("quadOffset", meshData.faceVertexBegin[i]);
-          glDrawElements(
-            GL_TRIANGLES,
-            meshData.faceVertexLength[i] * 6,
-            GL_UNSIGNED_INT,
-            (void*)0
-          );
-        }
-      }
-
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-      glBindVertexArray(0);
+    for (const auto& drawCommand : drawCommands) {
+      chunkRenderer.addDrawCommand(*drawCommand);
     }
+
+    chunkRenderer.render(*shader, *camera);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
