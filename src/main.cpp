@@ -77,7 +77,7 @@ bool init_opengl() {
 
   glEnable(GL_DEPTH_TEST);
 
-  glFrontFace(GL_CW);
+  glFrontFace(GL_CCW);
   glCullFace(GL_BACK);
   glEnable(GL_CULL_FACE);
 
@@ -272,12 +272,12 @@ int main(int argc, char* argv[]) {
   int maxQuads = CS * CS * CS * 6;
   std::vector<uint32_t> indices;
   for (uint32_t i = 0; i < maxQuads; i++) {
-    indices.push_back((i << 2) | 1u);
+    indices.push_back((i << 2) | 2u);
     indices.push_back((i << 2) | 0u);
-    indices.push_back((i << 2) | 2u);
-    indices.push_back((i << 2) | 2u);
-    indices.push_back((i << 2) | 3u);
     indices.push_back((i << 2) | 1u);
+    indices.push_back((i << 2) | 1u);
+    indices.push_back((i << 2) | 3u);
+    indices.push_back((i << 2) | 2u);
   }
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size(), indices.data(), GL_DYNAMIC_DRAW);
