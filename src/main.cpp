@@ -292,21 +292,8 @@ int main(int argc, char* argv[]) {
       auto rleVoxels = std::vector<uint8_t>(tableEntry.rleDataSize);
       memset(rleVoxels.data(), 0, tableEntry.rleDataSize);
       memcpy(rleVoxels.data(), levelFile.buffer.data() + tableEntry.rleDataBegin, tableEntry.rleDataSize);
-      rle::decompress(rleVoxels, *voxels);
 
-      // Create bit mask
-      // TODO: Create from RLE compression!
-      int i = 0;
-      for (int y = 0; y < CS_P; y++) {
-        for (int x = 0; x < CS_P; x++) {
-          for (int z = 0; z < CS_P; z++) {
-            if (voxels->at(i)) {
-              meshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
-            }
-            i++;
-          }
-        }
-      }
+      rle::decompressToVoxelsAndOpaqueMask(rleVoxels, *voxels, meshData.opaqueMask);
 
       mesh(voxels->data(), meshData);
 

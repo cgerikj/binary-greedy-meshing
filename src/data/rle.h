@@ -41,14 +41,55 @@ namespace rle {
     addRleRun(rleVoxels, (uint8_t)type, length);
   }
 
-  void decompress(std::vector<uint8_t> &rleVoxels, std::vector<uint8_t> &voxels) {
+  inline const uint64_t getBitRange(uint8_t low, uint8_t high) {
+    return  ((1ULL << (high - low + 1)) - 1) << low;
+  }
+
+  void decompressToVoxelsAndOpaqueMask(std::vector<uint8_t> &rleVoxels, std::vector<uint8_t> &voxels, uint64_t* opaqueMask) {
     uint8_t* p = rleVoxels.data();
     uint8_t* p_end = rleVoxels.data() + rleVoxels.size();
     uint8_t* u_p = voxels.data();
+
+    int opaqueMaskIndex = 0;
+    int opaqueMaskBitIndex = 0;
+
     while (p != p_end) {
+      uint8_t type = *p;
       uint8_t len = *(p + 1);
 
-      std::memset(u_p, *p, len);
+      std::memset(u_p, type, len);
+
+      // Decompress into opaqueMask
+      int remainingLength = len;
+      while (remainingLength) {
+        int remainingBitsInIndex = 64 - opaqueMaskBitIndex;
+        // Partial same int
+        if (remainingLength < remainingBitsInIndex) {
+          if (type) {
+            opaqueMask[opaqueMaskIndex] |= getBitRange(opaqueMaskBitIndex, opaqueMaskBitIndex + remainingLength - 1);
+          }
+          opaqueMaskBitIndex += remainingLength;
+          remainingLength = 0;
+        }
+        // Set n integers
+        else if (remainingLength >= 64 && opaqueMaskBitIndex == 0) {
+          int count = std::floor(remainingLength / 64);
+          if (type) {
+            memset(&opaqueMask[opaqueMaskIndex], (uint64_t)-1, count * sizeof(uint64_t));
+          }
+          opaqueMaskIndex += count;
+          remainingLength -= count * 64;
+        }
+        // Rest of int + left over
+        else if (remainingLength >= remainingBitsInIndex) {
+          if (type) {
+            opaqueMask[opaqueMaskIndex] |= getBitRange(opaqueMaskBitIndex, 63);
+          }
+          remainingLength -= remainingBitsInIndex;
+          opaqueMaskIndex++;
+          opaqueMaskBitIndex = 0;
+        }
+      }
 
       u_p += len;
       p += 2;
