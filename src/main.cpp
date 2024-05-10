@@ -15,13 +15,16 @@
 
 void create_chunk();
 
+const int WINDOW_WIDTH = 1280;
+const int WINDOW_HEIGHT = 720;
+
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_SAMPLES, 4);
+  glfwWindowHint(GLFW_SAMPLES, 2);
 
-  GLFWwindow* window = glfwCreateWindow(1280, 720, "Binary Greedy Meshing", nullptr, nullptr);
+  GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Binary Greedy Meshing V2", nullptr, nullptr);
   if (!window) {
     fprintf(stderr, "Unable to create GLFW window\n");
     glfwDestroyWindow(window);
@@ -111,9 +114,14 @@ enum class MESH_TYPE : int {
 
 int mesh_type = (int) MESH_TYPE::TERRAIN;
 
+struct ChunkRenderData {
+  glm::ivec3 chunkPos;
+  std::vector<DrawElementsIndirectCommand*> faceDrawCommands = { nullptr };
+};
+
 MeshData meshData;
 ChunkRenderer chunkRenderer;
-std::vector<DrawElementsIndirectCommand*> drawCommands;
+std::vector<ChunkRenderData> chunkRenderData;
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   camera->processMouseMovement(xpos - last_x, last_y - ypos);
@@ -202,7 +210,7 @@ void create_chunk() {
       for (int y = -r; y < r; y++) {
         for (int z = -r; z < r; z++) {
           if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
-            voxels[get_yzx_index(x + r, y + r, z + r)] = 1;
+            voxels[get_yzx_index(x + r, y + r, z + r)] = 2;
             meshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
           }
         }
@@ -249,7 +257,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   glfwSetWindowPos(window, 0, 31);
-  glfwSwapInterval(1);
+  glfwSwapInterval(0);
 
   glfwSetCursorPosCallback(window, mouse_callback);
   glfwSetKeyCallback(window, key_callback);
@@ -276,33 +284,39 @@ int main(int argc, char* argv[]) {
       memset(voxels, 0, CS_P3);
       memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
 
-      noise.generateTerrain(voxels, meshData.opaqueMask, 30, x, z);
+      noise.generateTerrainV2(voxels, meshData.opaqueMask, x, z, 30);
 
       mesh(voxels, meshData);
 
       if (meshData.vertexCount) {
+        glm::ivec3 chunkPos = glm::ivec3(x, y, z);
+        std::vector<DrawElementsIndirectCommand*> commands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+
         for (uint32_t i = 0; i <= 5; i++) {
           if (meshData.faceVertexLength[i]) {
             uint32_t y = 0;
             uint32_t baseInstance = (i << 24) | (z << 16) | (y << 8) | x;
 
             auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
-            drawCommands.push_back(drawCommand);
+
+            commands[i] = drawCommand;
 
             chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
           }
         }
+
+        chunkRenderData.push_back(ChunkRenderData({ chunkPos, commands }));
       }
     }
   }
 
   shader = new Shader("main", "main");
   camera = new Camera(glm::vec3(31, 65, -5));
-  camera->handleResolution(1280, 720);
+  camera->handleResolution(WINDOW_WIDTH, WINDOW_HEIGHT);
 
   float forwardMove = 0.0f;
   float rightMove = 0.0f;
-  float noclipSpeed = 30.0f;
+  float noclipSpeed = 250.0f;
 
   float deltaTime = 0.0f;
 
@@ -324,8 +338,51 @@ int main(int argc, char* argv[]) {
     auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
     camera->position += noclipSpeed * wishdir * deltaTime;
 
-    for (const auto& drawCommand : drawCommands) {
-      chunkRenderer.addDrawCommand(*drawCommand);
+    glm::ivec3 cameraChunkPos = glm::floor(camera->position / glm::vec3(CS));
+
+    for (const auto& data : chunkRenderData) {
+      for (int i = 0; i < 6; i++) {
+        auto& d = data.faceDrawCommands[i];
+        if (d) {
+          switch (i) {
+            case 0:
+              if (cameraChunkPos.y >= data.chunkPos.y) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 1:
+              if (cameraChunkPos.y <= data.chunkPos.y) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 2:
+              if (cameraChunkPos.x >= data.chunkPos.x) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 3:
+              if (cameraChunkPos.x <= data.chunkPos.x) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 4:
+              if (cameraChunkPos.z >= data.chunkPos.z) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 5:
+              if (cameraChunkPos.z <= data.chunkPos.z) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+          }
+        }
+      }
     }
 
     chunkRenderer.render(*shader, *camera);

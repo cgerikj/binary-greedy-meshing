@@ -5,7 +5,7 @@
 #include <utility>
 #include <glad/glad.h>
 
-static const int BUFFER_SIZE = 1e8;
+static const int BUFFER_SIZE = 5e8; // 500 mb
 static const uint32_t QUAD_SIZE = 8;
 static const int MAX_DRAW_COMMANDS = 100000;
 
