@@ -9,14 +9,16 @@
 #include "misc/utility.h"
 #include "misc/timer.h"
 #include "rendering/chunk_renderer.h"
+#include "data/level_file.h"
+#include "data/rle.h"
 
 #define BM_IMPLEMENTATION
 #include "mesher.h"
 
 void create_chunk();
 
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 720;
+const int WINDOW_WIDTH = 1920;
+const int WINDOW_HEIGHT = 1080;
 
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -122,6 +124,7 @@ struct ChunkRenderData {
 MeshData meshData;
 ChunkRenderer chunkRenderer;
 std::vector<ChunkRenderData> chunkRenderData;
+LevelFile levelFile;
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   camera->processMouseMovement(xpos - last_x, last_y - ypos);
@@ -277,25 +280,45 @@ int main(int argc, char* argv[]) {
 
   // create_chunk();
 
-  uint8_t* voxels = new uint8_t[CS_P3] { 0 };
+  // Load
+  if (true) {
+    std::vector<uint8_t>* voxels = new std::vector<uint8_t>(CS_P3);
 
-  for (uint32_t x = 0; x < 5; x++) {
-    for (uint32_t z = 0; z < 5; z++) {
-      memset(voxels, 0, CS_P3);
+    levelFile.loadFromFile("demo_terrain_64");
+
+    for (const auto& tableEntry : levelFile.chunkTable) {
       memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
 
-      noise.generateTerrainV2(voxels, meshData.opaqueMask, x, z, 30);
+      auto rleVoxels = std::vector<uint8_t>(tableEntry.rleDataSize);
+      memset(rleVoxels.data(), 0, tableEntry.rleDataSize);
+      memcpy(rleVoxels.data(), levelFile.buffer.data() + tableEntry.rleDataBegin, tableEntry.rleDataSize);
+      rle::decompress(rleVoxels, *voxels);
 
-      mesh(voxels, meshData);
+      // Create bit mask
+      // TODO: Create from RLE compression!
+      int i = 0;
+      for (int y = 0; y < CS_P; y++) {
+        for (int x = 0; x < CS_P; x++) {
+          for (int z = 0; z < CS_P; z++) {
+            if (voxels->at(i)) {
+              meshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
+            }
+            i++;
+          }
+        }
+      }
+
+      mesh(voxels->data(), meshData);
 
       if (meshData.vertexCount) {
-        glm::ivec3 chunkPos = glm::ivec3(x, y, z);
+        uint32_t y = 0;
+
+        glm::ivec3 chunkPos = parse_xyz_key(tableEntry.key);
         std::vector<DrawElementsIndirectCommand*> commands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
         for (uint32_t i = 0; i <= 5; i++) {
           if (meshData.faceVertexLength[i]) {
-            uint32_t y = 0;
-            uint32_t baseInstance = (i << 24) | (z << 16) | (y << 8) | x;
+            uint32_t baseInstance = (i << 24) | (chunkPos.z << 16) | (chunkPos.y << 8) | chunkPos.x;
 
             auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
 
@@ -308,6 +331,28 @@ int main(int argc, char* argv[]) {
         chunkRenderData.push_back(ChunkRenderData({ chunkPos, commands }));
       }
     }
+  }
+
+  // Generate terrain
+  else {
+    int size = 16;
+    levelFile.initialize(size);
+
+    std::vector<uint8_t>* voxels = new std::vector<uint8_t>(CS_P3);
+    for (uint32_t x = 0; x < size; x++) {
+      for (uint32_t z = 0; z < size; z++) {
+        uint32_t y = 0;
+
+        memset(voxels->data(), 0, CS_P3);
+        memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+
+        noise.generateTerrainV2(voxels->data(), meshData.opaqueMask, x, z, 30);
+
+        levelFile.compressAndAddChunk(*voxels, get_xyz_key(x, y, z));
+      }
+    }
+
+    levelFile.saveToFile("demo_terrain_" + std::to_string(size));
   }
 
   shader = new Shader("main", "main");
