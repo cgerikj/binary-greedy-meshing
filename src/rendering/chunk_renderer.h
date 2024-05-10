@@ -64,11 +64,16 @@ public:
   DrawElementsIndirectCommand* getDrawCommand(int quadCount, uint32_t baseInstance) {
     unsigned int requestedSize = quadCount * QUAD_SIZE;
 
-    if (usedSlots.empty()) {
-      auto slot = new BufferSlot({ 0, requestedSize });
+    // Allocate at the end if possible
+    if ((BUFFER_SIZE - allocationEnd) > requestedSize) {
+      auto slot = new BufferSlot({ allocationEnd, requestedSize });
       usedSlots.push_back(slot);
+      allocationEnd += requestedSize;
       return createCommand(*slot, baseInstance);
     }
+
+    // Otherwise, iterate through and find gaps to allocate in
+    // Slow!
 
     auto prev = usedSlots.begin();
     BufferFit bestFit;
@@ -193,6 +198,7 @@ private:
 
   std::vector<BufferSlot*> usedSlots;
   std::vector<DrawElementsIndirectCommand> drawCommands;
+  uint32_t allocationEnd = 0;
 };
 
 #endif
