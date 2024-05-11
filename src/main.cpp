@@ -11,6 +11,7 @@
 #include "rendering/chunk_renderer.h"
 #include "data/level_file.h"
 #include "data/rle.h"
+#include "cxxpool.h"
 
 #define BM_IMPLEMENTATION
 #include "mesher.h"
@@ -19,6 +20,8 @@ void createTestChunk();
 
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
+const int MESHING_THREADS = 8;
+const int MAX_MESHING_FUTURES = MESHING_THREADS * 1;
 
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -121,7 +124,19 @@ struct ChunkRenderData {
   std::vector<DrawElementsIndirectCommand*> faceDrawCommands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 };
 
-MeshData meshData;
+struct ThreadData {
+  uint8_t* voxels;
+  MeshData* meshData;
+};
+
+struct MeshingResponse {
+  ChunkTableEntry* tableEntry;
+  ThreadData* threadData;
+  long long decompressionDurationUs;
+  long long meshingDurationUs;
+};
+
+MeshData mainThreadMeshData;
 ChunkRenderer chunkRenderer;
 std::vector<ChunkRenderData> chunkRenderData;
 ChunkRenderData testChunkRenderData;
@@ -168,16 +183,16 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 void createTestChunk() {
   uint8_t* voxels = new uint8_t[CS_P3] { 0 };
   memset(voxels, 0, CS_P3);
-  memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+  memset(mainThreadMeshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
 
   switch (mesh_type) {
     case (int) MESH_TYPE::TERRAIN: {
-      noise.generateTerrainV1(voxels, meshData.opaqueMask, 30);
+      noise.generateTerrainV1(voxels, mainThreadMeshData.opaqueMask, 30);
       break;
     }
 
     case (int) MESH_TYPE::RANDOM: {
-      noise.generateWhiteNoiseTerrain(voxels, meshData.opaqueMask, 30);
+      noise.generateWhiteNoiseTerrain(voxels, mainThreadMeshData.opaqueMask, 30);
       break;
     }
 
@@ -187,16 +202,16 @@ void createTestChunk() {
           for (int z = 1; z < CS_P; z++) {
             if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
               voxels[get_yzx_index(x, y, z)] = 1;
-              meshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
+              mainThreadMeshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
               voxels[get_yzx_index(x - 1, y - 1, z)] = 2;
-              meshData.opaqueMask[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
+              mainThreadMeshData.opaqueMask[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
 
               voxels[get_yzx_index(x - 1, y, z - 1)] = 3;
-              meshData.opaqueMask[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
+              mainThreadMeshData.opaqueMask[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
 
               voxels[get_yzx_index(x, y - 1, z - 1)] = 4;
-              meshData.opaqueMask[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
+              mainThreadMeshData.opaqueMask[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
             }
           }
         }
@@ -211,7 +226,7 @@ void createTestChunk() {
           for (int z = -r; z < r; z++) {
             if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
               voxels[get_yzx_index(x + r, y + r, z + r)] = 8;
-              meshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
+              mainThreadMeshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
             }
           }
         }
@@ -230,7 +245,7 @@ void createTestChunk() {
     Timer timer(std::to_string(iterations) + " iterations", true);
 
     for (int i = 0; i < iterations; i++) {
-      mesh(voxels, meshData);
+      mesh(voxels, mainThreadMeshData);
     }
   }
 
@@ -242,25 +257,38 @@ void createTestChunk() {
     }
   }
 
-  if (meshData.vertexCount) {
+  if (mainThreadMeshData.vertexCount) {
     uint32_t y = 0;
     glm::ivec3 chunkPos = glm::ivec3(levelFile.getSize() / 2, 1, levelFile.getSize() / 2);
 
     for (uint32_t i = 0; i <= 5; i++) {
-      if (meshData.faceVertexLength[i]) {
+      if (mainThreadMeshData.faceVertexLength[i]) {
         uint32_t baseInstance = (i << 24) | (chunkPos.z << 16) | (chunkPos.y << 8) | chunkPos.x;
 
-        auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
+        auto drawCommand = chunkRenderer.getDrawCommand(mainThreadMeshData.faceVertexLength[i], baseInstance);
 
         testChunkRenderData.faceDrawCommands[i] = drawCommand;
 
-        chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
+        chunkRenderer.buffer(*drawCommand, mainThreadMeshData.vertices->data() + mainThreadMeshData.faceVertexBegin[i]);
       }
     }
   }
 
-  printf("vertex count: %i\n", meshData.vertexCount);
+  printf("vertex count: %i\n", mainThreadMeshData.vertexCount);
 }
+
+auto meshLambda = [](ChunkTableEntry* tableEntry, ThreadData* threadData) -> MeshingResponse {
+  Timer decompressionTimer("", true);
+  memset(threadData->meshData->opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+  rle::decompressToVoxelsAndOpaqueMask(levelFile.buffer.data() + tableEntry->rleDataBegin, tableEntry->rleDataSize, threadData->voxels, threadData->meshData->opaqueMask);
+  auto decompressionDurationUs = decompressionTimer.end();
+
+  Timer meshingTimer("", true);
+  mesh(threadData->voxels, *threadData->meshData);
+  auto meshingDurationUs = meshingTimer.end();
+
+  return MeshingResponse({ tableEntry, threadData, decompressionDurationUs, meshingDurationUs });
+};
 
 int main(int argc, char* argv[]) {
   glfwSetErrorCallback(glfw_error_callback);
@@ -285,57 +313,104 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  meshData.opaqueMask = new uint64_t[CS_P2] { 0 };
-  meshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
-
-  meshData.vertices = new std::vector<uint64_t>(10000);
-  meshData.maxVertices = 10000;
+  mainThreadMeshData.opaqueMask = new uint64_t[CS_P2] { 0 };
+  mainThreadMeshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
+  mainThreadMeshData.vertices = new std::vector<uint64_t>(10000);
+  mainThreadMeshData.maxVertices = 10000;
 
   chunkRenderer.init();
 
   // Load
   if (true) {
-    uint8_t* voxels = new uint8_t[CS_P3] { 0 };
-
-    levelFile.loadFromFile("demo_terrain_64");
+    {
+      Timer loadFileTimer("loading level file", true);
+      levelFile.loadFromFile("demo_terrain_96");
+    }
 
     long long totalMeshingDurationUs = 0;
     long long totalDecompressionDurationUs = 0;
     long long totalMeshBufferingDurationUs = 0;
 
-    for (const auto& tableEntry : levelFile.chunkTable) {
-      Timer decompressionTimer("", true);
-      memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
-      rle::decompressToVoxelsAndOpaqueMask(levelFile.buffer.data() + tableEntry.rleDataBegin, tableEntry.rleDataSize, voxels, meshData.opaqueMask);
-      totalDecompressionDurationUs += decompressionTimer.end();
+    // Create a temporary thread pool for meshing all chunks on load
+    cxxpool::thread_pool threadPool{MESHING_THREADS};
+    std::unordered_map<uint32_t, std::future<MeshingResponse>> meshFutures;
 
-      Timer meshingTimer("", true);
-      mesh(voxels, meshData);
-      totalMeshingDurationUs += meshingTimer.end();
+    // Create MAX_MESHING_FUTURES instances of ThreadData
+    std::queue<ThreadData*> threadingMeshData = {};
+    for (int i = 0; i < MAX_MESHING_FUTURES; i++) {
+      auto meshData = new MeshData();
+      meshData->opaqueMask = new uint64_t[CS_P2] { 0 };
+      meshData->faceMasks = new uint64_t[CS_2 * 6] { 0 };
+      meshData->vertices = new std::vector<uint64_t>(10000);
+      meshData->maxVertices = 10000;
+      auto threadData = new ThreadData();
+      threadData->meshData = meshData;
+      threadData->voxels = new uint8_t[CS_P3] { 0 };
+      threadingMeshData.push(threadData);
+    }
 
-      if (meshData.vertexCount) {
-        Timer meshBufferingTimer("", true);
+    // Create a queue of all chunks
+    std::queue<ChunkTableEntry*> meshQueue = {};
+    for (auto& tableEntry : levelFile.chunkTable) {
+      meshQueue.push(&tableEntry);
+    }
 
-        uint32_t y = 0;
-        glm::ivec3 chunkPos = parse_xyz_key(tableEntry.key);
-        std::vector<DrawElementsIndirectCommand*> commands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+    while (meshFutures.size() || meshQueue.size()) {
 
-        for (uint32_t i = 0; i <= 5; i++) {
-          if (meshData.faceVertexLength[i]) {
-            uint32_t baseInstance = (i << 24) | (chunkPos.z << 16) | (chunkPos.y << 8) | chunkPos.x;
+      // Create new futures
+      while (meshFutures.size() < MAX_MESHING_FUTURES && threadingMeshData.size() && meshQueue.size()) {
+        auto threadData = threadingMeshData.front();
+        threadingMeshData.pop();
 
-            auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
+        ChunkTableEntry* entry = meshQueue.front();
+        meshQueue.pop();
 
-            commands[i] = drawCommand;
+        meshFutures.emplace(entry->key, threadPool.push(meshLambda, entry, threadData));
+      }
 
-            chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
+      // Handle completed futures
+      std::vector<uint32_t> finishedMeshKeys;
+      for (auto& [future_key, future] : meshFutures) {
+        if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+          finishedMeshKeys.push_back(future_key);
+
+          auto response = future.get();
+          threadingMeshData.push(response.threadData);
+
+          auto meshData = *response.threadData->meshData;
+          totalDecompressionDurationUs += response.decompressionDurationUs;
+          totalMeshingDurationUs += response.meshingDurationUs;
+
+          Timer meshBufferingTimer("", true);
+          if (meshData.vertexCount) {
+            uint32_t y = 0;
+            glm::ivec3 chunkPos = parse_xyz_key(response.tableEntry->key);
+            std::vector<DrawElementsIndirectCommand*> commands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+
+            for (uint32_t i = 0; i <= 5; i++) {
+              if (response.threadData->meshData->faceVertexLength[i]) {
+                uint32_t baseInstance = (i << 24) | (chunkPos.z << 16) | (chunkPos.y << 8) | chunkPos.x;
+
+                auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
+
+                commands[i] = drawCommand;
+
+                chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
+              }
+            }
+            chunkRenderData.push_back(ChunkRenderData({ chunkPos, commands }));
           }
+          totalMeshBufferingDurationUs += meshBufferingTimer.end();
         }
-        chunkRenderData.push_back(ChunkRenderData({ chunkPos, commands }));
+      }
 
-        totalMeshBufferingDurationUs += meshBufferingTimer.end();
+      for (auto key : finishedMeshKeys) {
+        meshFutures.erase(key);
       }
     }
+
+    // TODO: Clean up memory!
+
     printf("\n------------------------------------\n");
     printf("Finished loading %llu chunks:\n", levelFile.chunkTable.size());
     printf("\  Decompression: %lluus avg\n", totalDecompressionDurationUs / levelFile.chunkTable.size());
@@ -355,9 +430,9 @@ int main(int argc, char* argv[]) {
         uint32_t y = 0;
 
         memset(voxels->data(), 0, CS_P3);
-        memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+        memset(mainThreadMeshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
 
-        noise.generateTerrainV2(voxels->data(), meshData.opaqueMask, x, z, 30);
+        noise.generateTerrainV2(voxels->data(), mainThreadMeshData.opaqueMask, x, z, 30);
 
         levelFile.compressAndAddChunk(*voxels, get_xyz_key(x, y, z));
       }

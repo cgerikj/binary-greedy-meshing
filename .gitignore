@@ -4,3 +4,4 @@ settings.json
 libraries/*
 !libraries/include
 !libraries/glad
+!libraries/cxxpool

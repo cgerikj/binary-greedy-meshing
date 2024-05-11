@@ -9,6 +9,7 @@ set(GLFW_DIR "${LIB_DIR}/glfw")
 set(GLAD_DIR "${LIB_DIR}/glad")
 set(GLM_DIR "${LIB_DIR}/glm")
 set(FAST_NOISE_DIR "${LIB_DIR}/FastNoise")
+set(CXXPOOL_DIR "${LIB_DIR}/cxxpool")
 
 add_subdirectory(${GLM_DIR} EXCLUDE_FROM_ALL)
 add_subdirectory(${GLFW_DIR})
@@ -32,6 +33,7 @@ target_include_directories(client PRIVATE ${SRC_DIR})
 target_include_directories(client PRIVATE ${COMMON_DIR})
 target_include_directories(client PRIVATE "${GLFW_DIR}/include")
 target_include_directories(client PRIVATE "${GLAD_DIR}/include")
+target_include_directories(client PRIVATE "${CXXPOOL_DIR}/include")
 
 target_compile_definitions(client PRIVATE "GLFW_INCLUDE_NONE")
 
