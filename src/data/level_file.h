@@ -37,6 +37,10 @@ public:
     buffer.assign(maxFileSize, 0);
   }
 
+  uint8_t getSize() {
+    return size;
+  }
+
   void loadFromFile(std::string levelName) {
     std::ifstream file("..\\levels\\" + levelName, std::ios::binary);
     file.unsetf(std::ios::skipws);

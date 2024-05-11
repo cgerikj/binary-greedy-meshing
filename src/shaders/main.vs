@@ -27,14 +27,15 @@ const vec3 normalLookup[6] = {
   vec3( 0, 0, -1 )
 };
 
-const vec3 colorLookup[7] = {
+const vec3 colorLookup[8] = {
   vec3(0.2, 0.659, 0.839),
   vec3(0.302, 0.302, 0.302),
   vec3(0.278, 0.600, 0.141),
   vec3(0.1, 0.1, 0.6),
   vec3(0.1, 0.6, 0.6),
   vec3(0.6, 0.1, 0.6),
-  vec3(0.6, 0.6, 0.1)
+  vec3(0.6, 0.6, 0.1),
+  vec3(0.6, 0.1, 0.1)
 };
 
 const int flipLookup[6] = int[6](1, -1, -1, 1, -1, 1);

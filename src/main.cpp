@@ -15,7 +15,7 @@
 #define BM_IMPLEMENTATION
 #include "mesher.h"
 
-void create_chunk();
+void createTestChunk();
 
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
@@ -106,24 +106,25 @@ float last_x = 0.0f;
 float last_y = 0.0f;
 
 enum class MESH_TYPE : int {
-  TERRAIN,
   SPHERE,
+  TERRAIN,
   RANDOM,
   CHECKERBOARD,
   EMPTY,
   Count
 };
 
-int mesh_type = (int) MESH_TYPE::TERRAIN;
+int mesh_type = (int) MESH_TYPE::SPHERE;
 
 struct ChunkRenderData {
-  glm::ivec3 chunkPos;
-  std::vector<DrawElementsIndirectCommand*> faceDrawCommands = { nullptr };
+  glm::ivec3 chunkPos = glm::ivec3(0);
+  std::vector<DrawElementsIndirectCommand*> faceDrawCommands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 };
 
 MeshData meshData;
 ChunkRenderer chunkRenderer;
 std::vector<ChunkRenderData> chunkRenderData;
+ChunkRenderData testChunkRenderData;
 LevelFile levelFile;
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
@@ -152,7 +153,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   }
 
   else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
-    // create_chunk();
+    createTestChunk();
   }
 
   else if (key == GLFW_KEY_TAB && action == GLFW_RELEASE) {
@@ -160,73 +161,68 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (mesh_type >= (int) MESH_TYPE::Count) {
       mesh_type = 0;
     }
-    // create_chunk();
+    createTestChunk();
   }
 }
 
-void create_chunk() {
+void createTestChunk() {
   uint8_t* voxels = new uint8_t[CS_P3] { 0 };
   memset(voxels, 0, CS_P3);
   memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
 
   switch (mesh_type) {
-  case (int) MESH_TYPE::TERRAIN:
-  {
-    // noise.generateTerrain(voxels, meshData.opaqueMask, 30);
-    break;
-  }
+    case (int) MESH_TYPE::TERRAIN: {
+      noise.generateTerrainV1(voxels, meshData.opaqueMask, 30);
+      break;
+    }
 
-  case (int) MESH_TYPE::RANDOM:
-  {
-    noise.generateWhiteNoiseTerrain(voxels, meshData.opaqueMask, 30);
-    break;
-  }
+    case (int) MESH_TYPE::RANDOM: {
+      noise.generateWhiteNoiseTerrain(voxels, meshData.opaqueMask, 30);
+      break;
+    }
 
-  case (int) MESH_TYPE::CHECKERBOARD:
-  {
-    for (int x = 1; x < CS_P; x++) {
-      for (int y = 1; y < CS_P; y++) {
-        for (int z = 1; z < CS_P; z++) {
-          if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
-            voxels[get_yzx_index(x, y, z)] = 1;
-            meshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
+    case (int) MESH_TYPE::CHECKERBOARD: {
+      for (int x = 1; x < CS_P; x++) {
+        for (int y = 1; y < CS_P; y++) {
+          for (int z = 1; z < CS_P; z++) {
+            if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
+              voxels[get_yzx_index(x, y, z)] = 1;
+              meshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
-            voxels[get_yzx_index(x - 1, y - 1, z)] = 2;
-            meshData.opaqueMask[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
+              voxels[get_yzx_index(x - 1, y - 1, z)] = 2;
+              meshData.opaqueMask[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
 
-            voxels[get_yzx_index(x - 1, y, z - 1)] = 3;
-            meshData.opaqueMask[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
+              voxels[get_yzx_index(x - 1, y, z - 1)] = 3;
+              meshData.opaqueMask[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
 
-            voxels[get_yzx_index(x, y - 1, z - 1)] = 4;
-            meshData.opaqueMask[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
+              voxels[get_yzx_index(x, y - 1, z - 1)] = 4;
+              meshData.opaqueMask[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
+            }
           }
         }
       }
+      break;
     }
-    break;
-  }
 
-  case (int) MESH_TYPE::SPHERE:
-  {
-    int r = CS_P / 2;
-    for (int x = -r; x < r; x++) {
-      for (int y = -r; y < r; y++) {
-        for (int z = -r; z < r; z++) {
-          if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
-            voxels[get_yzx_index(x + r, y + r, z + r)] = 2;
-            meshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
+    case (int) MESH_TYPE::SPHERE: {
+      int r = CS_P / 2;
+      for (int x = -r; x < r; x++) {
+        for (int y = -r; y < r; y++) {
+          for (int z = -r; z < r; z++) {
+            if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
+              voxels[get_yzx_index(x + r, y + r, z + r)] = 8;
+              meshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
+            }
           }
         }
       }
+      break;
     }
-    break;
-  }
 
-  case (int) MESH_TYPE::EMPTY:
-  {
-    // empty!
-    break;
-  }
+    case (int) MESH_TYPE::EMPTY: {
+      // empty!
+      break;
+    }
   }
 
   {
@@ -238,10 +234,29 @@ void create_chunk() {
     }
   }
 
+  for (auto& cmd : testChunkRenderData.faceDrawCommands) {
+    if (cmd) {
+      chunkRenderer.removeDrawCommand(cmd);
+      delete cmd;
+      cmd = nullptr;
+    }
+  }
+
   if (meshData.vertexCount) {
-    //auto drawCommand = chunkRenderer.getDrawCommand(meshData.vertexCount, 0);
-    //chunkRenderer.buffer(*drawCommand, meshData.vertices->data());
-    //drawCommands.push_back(drawCommand);
+    uint32_t y = 0;
+    glm::ivec3 chunkPos = glm::ivec3(levelFile.getSize() / 2, 1, levelFile.getSize() / 2);
+
+    for (uint32_t i = 0; i <= 5; i++) {
+      if (meshData.faceVertexLength[i]) {
+        uint32_t baseInstance = (i << 24) | (chunkPos.z << 16) | (chunkPos.y << 8) | chunkPos.x;
+
+        auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
+
+        testChunkRenderData.faceDrawCommands[i] = drawCommand;
+
+        chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
+      }
+    }
   }
 
   printf("vertex count: %i\n", meshData.vertexCount);
@@ -277,8 +292,6 @@ int main(int argc, char* argv[]) {
   meshData.maxVertices = 10000;
 
   chunkRenderer.init();
-
-  // create_chunk();
 
   // Load
   if (true) {
@@ -353,8 +366,10 @@ int main(int argc, char* argv[]) {
     levelFile.saveToFile("demo_terrain_" + std::to_string(size));
   }
 
+  createTestChunk();
+
   shader = new Shader("main", "main");
-  camera = new Camera(glm::vec3(31, 65, -5));
+  camera = new Camera(glm::vec3(levelFile.getSize() * CS / 2, 65, levelFile.getSize() * CS / 2));
   camera->handleResolution(WINDOW_WIDTH, WINDOW_HEIGHT);
 
   float forwardMove = 0.0f;
@@ -380,6 +395,12 @@ int main(int argc, char* argv[]) {
     else rightMove = 0.0f;
     auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
     camera->position += noclipSpeed * wishdir * deltaTime;
+
+    for (const auto& testCmd : testChunkRenderData.faceDrawCommands) {
+      if (testCmd) {
+        chunkRenderer.addDrawCommand(*testCmd);
+      }
+    }
 
     glm::ivec3 cameraChunkPos = glm::floor(camera->position / glm::vec3(CS));
 

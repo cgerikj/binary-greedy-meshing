@@ -20,13 +20,13 @@ public:
     noise2.SetFractalLacunarity(2.0);
   }
 
-  void generateTerrainV1(uint8_t* voxels, uint64_t* opaqueMask, int seed, int offsetX, int offsetZ) {
+  void generateTerrainV1(uint8_t* voxels, uint64_t* opaqueMask, int seed) {
     noise1.SetSeed(seed);
 
     for (int x = 0; x < CS_P; x++) {
       for (int y = CS_P - 1; y--;) {
         for (int z = 0; z < CS_P; z++) {
-          float val = ((noise1.GetSimplexFractal((offsetX * CS) + x, y, (offsetZ * CS) + z)) + 1.0f) / 2.0f;
+          float val = ((noise1.GetSimplexFractal(x, y, z)) + 1.0f) / 2.0f;
 
           if (val > glm::smoothstep(0.15f, 1.0f, (float) y / (float) CS_P)) {
             int i = get_yzx_index(x, y, z);
