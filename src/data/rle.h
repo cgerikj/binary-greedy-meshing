@@ -45,10 +45,10 @@ namespace rle {
     return  ((1ULL << (high - low + 1)) - 1) << low;
   }
 
-  void decompressToVoxelsAndOpaqueMask(std::vector<uint8_t> &rleVoxels, std::vector<uint8_t> &voxels, uint64_t* opaqueMask) {
-    uint8_t* p = rleVoxels.data();
-    uint8_t* p_end = rleVoxels.data() + rleVoxels.size();
-    uint8_t* u_p = voxels.data();
+  void decompressToVoxelsAndOpaqueMask(uint8_t* rleVoxels, int rleSize, uint8_t* voxels, uint64_t* opaqueMask) {
+    uint8_t* p = rleVoxels;
+    uint8_t* p_end = rleVoxels + rleSize;
+    uint8_t* u_p = voxels;
 
     int opaqueMaskIndex = 0;
     int opaqueMaskBitIndex = 0;

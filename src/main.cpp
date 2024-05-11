@@ -282,24 +282,28 @@ int main(int argc, char* argv[]) {
 
   // Load
   if (true) {
-    std::vector<uint8_t>* voxels = new std::vector<uint8_t>(CS_P3);
+    uint8_t* voxels = new uint8_t[CS_P3] { 0 };
 
     levelFile.loadFromFile("demo_terrain_64");
 
+    long long totalMeshingDurationUs = 0;
+    long long totalDecompressionDurationUs = 0;
+    long long totalMeshBufferingDurationUs = 0;
+
     for (const auto& tableEntry : levelFile.chunkTable) {
+      Timer decompressionTimer("", true);
       memset(meshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+      rle::decompressToVoxelsAndOpaqueMask(levelFile.buffer.data() + tableEntry.rleDataBegin, tableEntry.rleDataSize, voxels, meshData.opaqueMask);
+      totalDecompressionDurationUs += decompressionTimer.end();
 
-      auto rleVoxels = std::vector<uint8_t>(tableEntry.rleDataSize);
-      memset(rleVoxels.data(), 0, tableEntry.rleDataSize);
-      memcpy(rleVoxels.data(), levelFile.buffer.data() + tableEntry.rleDataBegin, tableEntry.rleDataSize);
-
-      rle::decompressToVoxelsAndOpaqueMask(rleVoxels, *voxels, meshData.opaqueMask);
-
-      mesh(voxels->data(), meshData);
+      Timer meshingTimer("", true);
+      mesh(voxels, meshData);
+      totalMeshingDurationUs += meshingTimer.end();
 
       if (meshData.vertexCount) {
-        uint32_t y = 0;
+        Timer meshBufferingTimer("", true);
 
+        uint32_t y = 0;
         glm::ivec3 chunkPos = parse_xyz_key(tableEntry.key);
         std::vector<DrawElementsIndirectCommand*> commands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
@@ -314,10 +318,17 @@ int main(int argc, char* argv[]) {
             chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
           }
         }
-
         chunkRenderData.push_back(ChunkRenderData({ chunkPos, commands }));
+
+        totalMeshBufferingDurationUs += meshBufferingTimer.end();
       }
     }
+    printf("\n------------------------------------\n");
+    printf("Finished loading %llu chunks:\n", levelFile.chunkTable.size());
+    printf("\  Decompression: %lluus avg\n", totalDecompressionDurationUs / levelFile.chunkTable.size());
+    printf("\  Meshing: %lluus avg \n", totalMeshingDurationUs / levelFile.chunkTable.size());
+    printf("\  Buffering: %lluus avg \n", totalMeshBufferingDurationUs / levelFile.chunkTable.size());
+    printf("------------------------------------\n\n");
   }
 
   // Generate terrain
