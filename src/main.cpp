@@ -315,6 +315,8 @@ int main(int argc, char* argv[]) {
 
   mainThreadMeshData.opaqueMask = new uint64_t[CS_P2] { 0 };
   mainThreadMeshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
+  mainThreadMeshData.forwardMerged = new uint8_t[CS_2] { 0 };
+  mainThreadMeshData.rightMerged = new uint8_t[CS] { 0 };
   mainThreadMeshData.vertices = new std::vector<uint64_t>(10000);
   mainThreadMeshData.maxVertices = 10000;
 
@@ -341,6 +343,8 @@ int main(int argc, char* argv[]) {
       auto meshData = new MeshData();
       meshData->opaqueMask = new uint64_t[CS_P2] { 0 };
       meshData->faceMasks = new uint64_t[CS_2 * 6] { 0 };
+      meshData->forwardMerged = new uint8_t[CS_2] { 0 };
+      meshData->rightMerged = new uint8_t[CS] { 0 };
       meshData->vertices = new std::vector<uint64_t>(10000);
       meshData->maxVertices = 10000;
       auto threadData = new ThreadData();

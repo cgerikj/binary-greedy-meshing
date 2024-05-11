@@ -61,14 +61,8 @@ static constexpr int CS_P3 = CS_P * CS_P * CS_P;
 struct MeshData {
   uint64_t* faceMasks = nullptr; // CS_2 * 6
   uint64_t* opaqueMask = nullptr; //CS_P2
-
-  // Vertex data is packed into one unsigned integer:
-  // - x, y, z: 6 bit each (0-63)
-  // - Type: 8 bit (0-255)
-  // - Normal: 3 bit (0-5)
-  //
-  // Meshes can be offset to world space using a per-draw uniform or by packing xyz
-  // in gl_BaseInstance if rendering with glMultiDrawArraysIndirect.
+  uint8_t* forwardMerged = nullptr; // CS_2
+  uint8_t* rightMerged = nullptr; // CS
   BM_VECTOR<uint64_t>* vertices = nullptr;
   int vertexCount = 0;
   int maxVertices = 0;
@@ -126,6 +120,8 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
   uint64_t* opaqueMask = meshData.opaqueMask;
   uint64_t* faceMasks = meshData.faceMasks;
+  uint8_t* forwardMerged = meshData.forwardMerged;
+  uint8_t* rightMerged = meshData.rightMerged;
 
   //Hidden face culling
   for (int a = 1; a < CS_P - 1; a++) {
@@ -144,7 +140,6 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
   }
 
   //Greedy meshing faces 0-3
-  uint8_t forwardMerged[CS_2] { 0 };
   for (int face = 0; face < 4; face++) {
     int axis = face / 2;
 
@@ -213,7 +208,6 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
   }
 
   //Greedy meshing faces 4-5
-  uint8_t rightMerged[CS] { 0 };
   for (int face = 4; face < 6; face++) {
     int axis = face / 2;
 
