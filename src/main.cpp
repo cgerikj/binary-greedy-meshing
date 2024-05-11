@@ -226,7 +226,7 @@ void createTestChunk() {
   }
 
   {
-    int iterations = 1;
+    int iterations = 1000;
     Timer timer(std::to_string(iterations) + " iterations", true);
 
     for (int i = 0; i < iterations; i++) {
@@ -369,7 +369,7 @@ int main(int argc, char* argv[]) {
   createTestChunk();
 
   shader = new Shader("main", "main");
-  camera = new Camera(glm::vec3(levelFile.getSize() * CS / 2, 65, levelFile.getSize() * CS / 2));
+  camera = new Camera(glm::vec3(levelFile.getSize() * CS / 2, 100, (levelFile.getSize() * CS / 2) - 30));
   camera->handleResolution(WINDOW_WIDTH, WINDOW_HEIGHT);
 
   float forwardMove = 0.0f;
