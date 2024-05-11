@@ -9,19 +9,24 @@
 class Noise {
 public:
   Noise() {
-    noise.SetFrequency(0.02);
-    noise.SetFractalType(FastNoise::FBM);
-    noise.SetFractalOctaves(5);
-    noise.SetFractalLacunarity(2.0);
+    noise1.SetFrequency(0.02);
+    noise1.SetFractalType(FastNoise::FBM);
+    noise1.SetFractalOctaves(5);
+    noise1.SetFractalLacunarity(2.0);
+
+    noise2.SetFrequency(0.006);
+    noise2.SetFractalType(FastNoise::FBM);
+    noise2.SetFractalOctaves(5);
+    noise2.SetFractalLacunarity(2.0);
   }
 
-  void generateTerrain(uint8_t* voxels, uint64_t* opaqueMask, int seed) {
-    noise.SetSeed(seed);
+  void generateTerrainV1(uint8_t* voxels, uint64_t* opaqueMask, int seed) {
+    noise1.SetSeed(seed);
 
     for (int x = 0; x < CS_P; x++) {
       for (int y = CS_P - 1; y--;) {
         for (int z = 0; z < CS_P; z++) {
-          float val = ((noise.GetSimplexFractal(x, y, z)) + 1.0f) / 2.0f;
+          float val = ((noise1.GetSimplexFractal(x, y, z)) + 1.0f) / 2.0f;
 
           if (val > glm::smoothstep(0.15f, 1.0f, (float) y / (float) CS_P)) {
             int i = get_yzx_index(x, y, z);
@@ -31,12 +36,45 @@ public:
 
             switch (voxels[i_above]) {
             case 0:
-              voxels[i] = 2;
+              voxels[i] = 3;
               break;
             default:
-              voxels[i] = 1;
+              voxels[i] = 2;
               break;
             }
+          }
+        }
+      }
+    }
+  }
+
+  void generateTerrainV2(uint8_t* voxels, uint64_t* opaqueMask, int offsetX, int offsetZ, int seed) {
+    noise2.SetSeed(seed);
+
+    for (int x = 0; x < CS_P; x++) {
+      for (int y = CS_P - 1; y--;) {
+        for (int z = 0; z < CS_P; z++) {
+          float val = (noise2.GetSimplexFractal((offsetX * CS) + x, y, (offsetZ * CS) + z) + 0.6f) / 1.35f;
+
+          int i = get_yzx_index(x, y, z);
+
+          if (val > (float) y / (float) CS_P) {
+            int i_above = get_yzx_index(x, y + 1, z);
+
+            opaqueMask[(y * CS_P) + x] |= 1ull << z;
+
+            switch (voxels[i_above]) {
+            case 0:
+              voxels[i] = 3;
+              break;
+            default:
+              voxels[i] = 2;
+              break;
+            }
+          }
+          else if (y < 25) {
+            opaqueMask[(y * CS_P) + x] |= 1ull << z;
+            voxels[i] = 1;
           }
         }
       }
@@ -66,7 +104,8 @@ public:
     }
   }
 
-  FastNoise noise;
+  FastNoise noise1;
+  FastNoise noise2;
   FastNoise whiteNoise;
 };
 

@@ -1,4 +1,4 @@
-#version 430 core
+#version 460 core
 
 struct QuadData {
   uint quadData1;
@@ -11,9 +11,6 @@ layout(binding = 0, std430) readonly buffer ssbo1 {
 
 uniform mat4 u_view;
 uniform mat4 u_projection;
-
-uniform int face;
-uniform int quadOffset;
 
 out VS_OUT {
   out vec3 pos;
@@ -30,20 +27,25 @@ const vec3 normalLookup[6] = {
   vec3( 0, 0, -1 )
 };
 
-const vec3 colorLookup[6] = {
-  vec3(0.6, 0.1, 0.1),
-  vec3(0.1, 0.6, 0.1),
+const vec3 colorLookup[8] = {
+  vec3(0.2, 0.659, 0.839),
+  vec3(0.302, 0.302, 0.302),
+  vec3(0.278, 0.600, 0.141),
   vec3(0.1, 0.1, 0.6),
   vec3(0.1, 0.6, 0.6),
   vec3(0.6, 0.1, 0.6),
-  vec3(0.6, 0.6, 0.1)
+  vec3(0.6, 0.6, 0.1),
+  vec3(0.6, 0.1, 0.1)
 };
 
 const int flipLookup[6] = int[6](1, -1, -1, 1, -1, 1);
 
 void main() {
+  vec3 chunkOffsetPos = vec3(gl_BaseInstance&255u, gl_BaseInstance>>8&255u, gl_BaseInstance>>16&255u) * 62;
+  uint face = gl_BaseInstance>>24;
+
   int quadIndex = int(gl_VertexID&3u);
-  uint ssboIndex = quadOffset + (gl_VertexID >> 2u);
+  uint ssboIndex = gl_VertexID >> 2u;
 
   uint quadData1 = data[ssboIndex].quadData1;
   uint quadData2 = data[ssboIndex].quadData2;
@@ -55,10 +57,10 @@ void main() {
   float w = float((quadData1 >> 18u)&63u);
   float h = float((quadData1 >> 24u)&63u);
 
-  int wDir = (face & 2) >> 1, hDir = 2 - (face >> 2);
+  uint wDir = (face & 2) >> 1, hDir = 2 - (face >> 2);
   int wMod = quadIndex >> 1, hMod = quadIndex & 1;
 
-  vs_out.pos = vec3(x, y, z);
+  vs_out.pos = chunkOffsetPos + vec3(x, y, z);
   vs_out.pos[wDir] += w * wMod * flipLookup[face];
   vs_out.pos[hDir] += h * hMod;
 
