@@ -12,6 +12,7 @@
 #include "data/level_file.h"
 #include "data/rle.h"
 #include "cxxpool.h"
+#include <thread>
 
 #define BM_IMPLEMENTATION
 #include "mesher.h"
@@ -20,8 +21,9 @@ void createTestChunk();
 
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
-const int MESHING_THREADS = 8;
-const int MAX_MESHING_FUTURES = MESHING_THREADS * 1;
+
+const int MESHING_THREADS = std::max((std::thread::hardware_concurrency() / 2) - 1, 2u);
+const int MAX_MESHING_FUTURES = MESHING_THREADS * 4;
 
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -334,7 +336,7 @@ int main(int argc, char* argv[]) {
     long long totalMeshBufferingDurationUs = 0;
 
     // Create a temporary thread pool for meshing all chunks on load
-    cxxpool::thread_pool threadPool{MESHING_THREADS};
+    cxxpool::thread_pool threadPool{ (size_t)MESHING_THREADS };
     std::unordered_map<uint32_t, std::future<MeshingResponse>> meshFutures;
 
     // Create MAX_MESHING_FUTURES instances of ThreadData
