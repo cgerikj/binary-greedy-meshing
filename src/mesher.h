@@ -248,7 +248,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
             continue;
           }
 
-          if ((bitsRight >> bitPos & 1) && forwardMerged[rightTimesCS + (bitPos - 1)] == forwardMerged[(rightTimesCS + right) + (bitPos - 1)]
+          if ((bitsRight >> bitPos & 1) && forwardMerged[rightTimesCS + (bitPos - 1)] == forwardMerged[(rightTimesCS + CS) + (bitPos - 1)]
             && type == voxels[getAxisIndex(axis, right + 2, forward + 1, bitPos)]) {
             forwardMerged[rightTimesCS + (bitPos - 1)] = 0;
             rightMerged[bitPos - 1]++;
