@@ -94,7 +94,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData);
 static inline const int getAxisIndex(const int axis, const int a, const int b, const int c) {
   if (axis == 0) return b + (a * CS_P) + (c * CS_P2);
   else if (axis == 1) return b + (c * CS_P) + (a * CS_P2);
-  else return c + (b * CS_P) + (a * CS_P2);
+  else return c + (a * CS_P) + (b * CS_P2);
 }
 
 static inline const void insertQuad(BM_VECTOR<uint64_t>& vertices, uint64_t quad, int& vertexI, int& maxVertices) {
@@ -134,8 +134,8 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
       faceMasks[(a - 1) + (b - 1) * CS + 2 * CS_2] = (cb & ~opaqueMask[a * CS_P + (b + 1)]) >> 1;
       faceMasks[(a - 1) + (b - 1) * CS + 3 * CS_2] = (cb & ~opaqueMask[a * CS_P + (b - 1)]) >> 1;
 
-      faceMasks[(a - 1) + (b - 1) * CS + 4 * CS_2] = cb & ~(opaqueMask[a * CS_P + b] >> 1);
-      faceMasks[(a - 1) + (b - 1) * CS + 5 * CS_2] = cb & ~(opaqueMask[a * CS_P + b] << 1);
+      faceMasks[(b - 1) + (a - 1) * CS + 4 * CS_2] = cb & ~(opaqueMask[a * CS_P + b] >> 1);
+      faceMasks[(b - 1) + (a - 1) * CS + 5 * CS_2] = cb & ~(opaqueMask[a * CS_P + b] << 1);
     }
   }
 
@@ -255,7 +255,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           forwardMerged[right * CS + (bitPos - 1)] = 0;
           rightMerged[bitPos - 1] = 0;
 
-          uint64_t quad = getQuad(meshFront + (face == 4 ? meshLength : 0), meshLeft, meshUp, meshLength, meshWidth, type);
+          uint64_t quad = getQuad(meshLeft + (face == 4 ? meshWidth : 0), meshFront, meshUp, meshWidth, meshLength, type);
 
           insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
         }
