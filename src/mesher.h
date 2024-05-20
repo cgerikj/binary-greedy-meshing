@@ -150,11 +150,10 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
     for (int layer = 0; layer < CS; layer++) {
       const int bitsLocation = layer * CS + face * CS_2;
-      uint64_t* faceMasksPtr = &faceMasks[bitsLocation];
 
       for (int forward = 0; forward < CS; forward++) {
-        uint64_t bitsHere = faceMasksPtr[forward];
-        const uint64_t bitsNext = forward + 1 < CS ? faceMasksPtr[forward + 1] : 0;
+        uint64_t bitsHere = faceMasks[forward + bitsLocation];
+        const uint64_t bitsNext = forward + 1 < CS ? faceMasks[(forward + 1) + bitsLocation] : 0;
 
         uint8_t rightMerged = 1;
         while (bitsHere) {
@@ -222,13 +221,10 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
       const int bitsLocation = forward * CS + face * CS_2;
       const int bitsForwardLocation = (forward + 1) * CS + face * CS_2;
 
-      uint64_t* faceMasksPtr = &faceMasks[bitsLocation];
-      uint64_t* faceMasksPtrForward = &faceMasks[bitsForwardLocation];
-
       for (int right = 0; right < CS; right++) {
-        uint64_t bitsHere = faceMasksPtr[right];
-        const uint64_t bitsForward = forward == CS - 1 ? 0 : faceMasksPtrForward[right];
-        const uint64_t bitsRight = right == CS - 1 ? 0 : faceMasksPtr[right + 1];
+        uint64_t bitsHere = faceMasks[right + bitsLocation];
+        const uint64_t bitsForward = forward == CS - 1 ? 0 : faceMasks[right + bitsForwardLocation];
+        const uint64_t bitsRight = right == CS - 1 ? 0 : faceMasks[right + 1 + bitsLocation];
         const int rightTimesCS = right * CS;
 
         while (bitsHere) {
