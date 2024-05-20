@@ -31,16 +31,10 @@ SOFTWARE.
 //   #include "mesher.h"
 //
 //   There are other defines to control the behaviour of the library.
-//   * Define BM_IVEC2 with your own vector implementation - otherwise it will use glm::ivec2
 //   * Define BM_VECTOR with your own vector implementation - otherwise it will use std::vector
 
 #ifndef MESHER_H
 #define MESHER_H
-
-#ifndef BM_IVEC2
-#include <glm/glm.hpp>
-#define BM_IVEC2 glm::ivec2
-#endif
 
 #ifndef BM_VECTOR
 #include <vector>
@@ -70,11 +64,7 @@ struct MeshData {
   int faceVertexLength[6] = { 0 };
 };
 
-// voxels - 64^3 (includes neighboring voxels)
-// vertices - pre-allocated array of vertices that will be poplulated. Can be re-used between runs and does not need to be clared.
-// vertexLength - output  number of vertices to read from vertices
-//
-// @param[in] voxels The input data includes duplicate edge data from neighboring chunks which is used
+// @param[in] voxels: The input data includes duplicate edge data from neighboring chunks which is used
 // for visibility culling. For optimal performance, your world data should already be structured
 // this way so that you can feed the data straight into this algorithm.
 // Input data is ordered in YXZ and is 64^3 which results in a 62^3 mesh.
@@ -123,7 +113,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
   uint8_t* forwardMerged = meshData.forwardMerged;
   uint8_t* rightMerged = meshData.rightMerged;
 
-  //Hidden face culling
+  // Hidden face culling
   for (int a = 1; a < CS_P - 1; a++) {
     const int aCS_P = a * CS_P;
 
@@ -143,7 +133,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
     }
   }
 
-  //Greedy meshing faces 0-3
+  // Greedy meshing faces 0-3
   for (int face = 0; face < 4; face++) {
     const int axis = face / 2;
 
@@ -214,7 +204,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
     meshData.faceVertexLength[face] =faceVertexLength;
   }
 
-  //Greedy meshing faces 4-5
+  // Greedy meshing faces 4-5
   for (int face = 4; face < 6; face++) {
     const int axis = face / 2;
 

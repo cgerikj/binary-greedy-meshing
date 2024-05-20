@@ -19,8 +19,11 @@
 
 void createTestChunk();
 
+const std::string DEMO_LEVEL_FILE = "demo_terrain_96";
+
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
+const bool FULLSCREEN = false;
 
 const int MESHING_THREADS = std::max((std::thread::hardware_concurrency() / 2) - 1, 2u);
 const int MAX_MESHING_FUTURES = MESHING_THREADS * 4;
@@ -31,7 +34,7 @@ GLFWwindow* init_window() {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SAMPLES, 2);
 
-  GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Binary Greedy Meshing V2", nullptr, nullptr);
+  GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Binary Greedy Meshing V2", FULLSCREEN ? glfwGetPrimaryMonitor() : nullptr, nullptr);
   if (!window) {
     fprintf(stderr, "Unable to create GLFW window\n");
     glfwDestroyWindow(window);
@@ -328,7 +331,7 @@ int main(int argc, char* argv[]) {
   if (true) {
     {
       Timer loadFileTimer("loading level file", true);
-      levelFile.loadFromFile("demo_terrain_96");
+      levelFile.loadFromFile(DEMO_LEVEL_FILE);
     }
 
     long long totalMeshingDurationUs = 0;

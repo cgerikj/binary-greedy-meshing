@@ -157,7 +157,7 @@ public:
     shader.setVec3("eye_position", camera.position);
 
     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, commandBuffer);
-    glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, numCommands * sizeof(DrawElementsIndirectCommand), drawCommands.data());
+    glBufferData(GL_DRAW_INDIRECT_BUFFER, numCommands * sizeof(DrawElementsIndirectCommand), drawCommands.data(), GL_DYNAMIC_DRAW);
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);

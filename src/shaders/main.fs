@@ -12,7 +12,7 @@ uniform vec3 eye_position;
 
 const vec3 diffuse_color = vec3(0.15, 0.15, 0.15);
 const vec3 rim_color = vec3(0.04, 0.04, 0.04);
-const vec3 sun_position = vec3(250.0, 1000.0, 750.0);
+const vec3 sun_position = vec3(250.0, 1000.0, 750.0) * 10000;
 
 void main() {
   vec3 L = normalize(sun_position - fs_in.pos);
