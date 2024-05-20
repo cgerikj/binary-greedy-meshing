@@ -125,20 +125,21 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
   //Hidden face culling
   for (int a = 1; a < CS_P - 1; a++) {
+    const int aCS_P = a * CS_P;
+
     for (int b = 1; b < CS_P - 1; b++) {
-        const uint64_t columnB = opaqueMask[(a * CS_P) + b] & P_MASK;
-        const int baIndex = (b - 1) + (a - 1) * CS;
-        const int abIndex = (a - 1) + (b - 1) * CS;
-        const int aChunkSizePadding = a * CS_P;
+      const uint64_t columnBits = opaqueMask[(a * CS_P) + b] & P_MASK;
+      const int baIndex = (b - 1) + (a - 1) * CS;
+      const int abIndex = (a - 1) + (b - 1) * CS;
 
-        faceMasks[baIndex + 0 * CS_2] = (columnB & ~opaqueMask[(a + 1) * CS_P + b]) >> 1;
-        faceMasks[baIndex + 1 * CS_2] = (columnB & ~opaqueMask[(a - 1) * CS_P + b]) >> 1;
+      faceMasks[baIndex + 0 * CS_2] = (columnBits & ~opaqueMask[(a + 1) * CS_P + b]) >> 1;
+      faceMasks[baIndex + 1 * CS_2] = (columnBits & ~opaqueMask[(a - 1) * CS_P + b]) >> 1;
 
-        faceMasks[abIndex + 2 * CS_2] = (columnB & ~opaqueMask[aChunkSizePadding + (b + 1)]) >> 1;
-        faceMasks[abIndex + 3 * CS_2] = (columnB & ~opaqueMask[aChunkSizePadding + (b - 1)]) >> 1;
+      faceMasks[abIndex + 2 * CS_2] = (columnBits & ~opaqueMask[aCS_P + (b + 1)]) >> 1;
+      faceMasks[abIndex + 3 * CS_2] = (columnBits & ~opaqueMask[aCS_P + (b - 1)]) >> 1;
 
-        faceMasks[baIndex + 4 * CS_2] = columnB & ~(opaqueMask[aChunkSizePadding + b] >> 1);
-        faceMasks[baIndex + 5 * CS_2] = columnB & ~(opaqueMask[aChunkSizePadding + b] << 1);
+      faceMasks[baIndex + 4 * CS_2] = columnBits & ~(opaqueMask[aCS_P + b] >> 1);
+      faceMasks[baIndex + 5 * CS_2] = columnBits & ~(opaqueMask[aCS_P + b] << 1);
     }
   }
 
@@ -153,6 +154,8 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
       for (int forward = 0; forward < CS; forward++) {
         uint64_t bitsHere = faceMasks[forward + bitsLocation];
+        if (bitsHere == 0) continue;
+
         const uint64_t bitsNext = forward + 1 < CS ? faceMasks[(forward + 1) + bitsLocation] : 0;
 
         uint8_t rightMerged = 1;
@@ -223,9 +226,11 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
       for (int right = 0; right < CS; right++) {
         uint64_t bitsHere = faceMasks[right + bitsLocation];
+        if (bitsHere == 0) continue;
+
         const uint64_t bitsForward = forward == CS - 1 ? 0 : faceMasks[right + bitsForwardLocation];
         const uint64_t bitsRight = right == CS - 1 ? 0 : faceMasks[right + 1 + bitsLocation];
-        const int rightTimesCS = right * CS;
+        const int rightCS = right * CS;
 
         while (bitsHere) {
           unsigned long bitPos;
@@ -240,25 +245,25 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           const uint8_t type = voxels[getAxisIndex(axis, right + 1, forward + 1, bitPos)];
 
           if (rightMerged[bitPos - 1] == 0 && (bitsForward >> bitPos & 1) && type == voxels[getAxisIndex(axis, right + 1, forward + 2, bitPos)]) {
-            forwardMerged[rightTimesCS + (bitPos - 1)]++;
+            forwardMerged[rightCS + (bitPos - 1)]++;
             continue;
           }
 
-          if ((bitsRight >> bitPos & 1) && forwardMerged[rightTimesCS + (bitPos - 1)] == forwardMerged[(rightTimesCS + CS) + (bitPos - 1)]
+          if ((bitsRight >> bitPos & 1) && forwardMerged[rightCS + (bitPos - 1)] == forwardMerged[(rightCS + CS) + (bitPos - 1)]
             && type == voxels[getAxisIndex(axis, right + 2, forward + 1, bitPos)]) {
-            forwardMerged[rightTimesCS + (bitPos - 1)] = 0;
+            forwardMerged[rightCS + (bitPos - 1)] = 0;
             rightMerged[bitPos - 1]++;
             continue;
           }
 
           const uint8_t meshLeft = right - rightMerged[bitPos - 1];
-          const uint8_t meshFront = forward - forwardMerged[rightTimesCS + bitPos - 1];
+          const uint8_t meshFront = forward - forwardMerged[rightCS + bitPos - 1];
           const uint8_t meshUp = bitPos - 1 + (~face & 1);
 
           const uint8_t meshWidth = 1 + rightMerged[bitPos - 1];
-          const uint8_t meshLength = 1 + forwardMerged[rightTimesCS + bitPos - 1];
+          const uint8_t meshLength = 1 + forwardMerged[rightCS + bitPos - 1];
 
-          forwardMerged[rightTimesCS + (bitPos - 1)] = 0;
+          forwardMerged[rightCS + (bitPos - 1)] = 0;
           rightMerged[bitPos - 1] = 0;
 
           const uint64_t quad = getQuad(meshLeft + (face == 4 ? meshWidth : 0), meshFront, meshUp, meshWidth, meshLength, type);
