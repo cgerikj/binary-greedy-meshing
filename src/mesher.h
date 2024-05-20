@@ -228,8 +228,8 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
         uint64_t bitsHere = faceMasks[right + bitsLocation];
         if (bitsHere == 0) continue;
 
-        const uint64_t bitsForward = forward == CS - 1 ? 0 : faceMasks[right + bitsForwardLocation];
-        const uint64_t bitsRight = right == CS - 1 ? 0 : faceMasks[right + 1 + bitsLocation];
+        const uint64_t bitsForward = forward < CS - 1 ? faceMasks[right + bitsForwardLocation] : 0;
+        const uint64_t bitsRight = right < CS - 1 ? faceMasks[right + 1 + bitsLocation] : 0;
         const int rightCS = right * CS;
 
         while (bitsHere) {
