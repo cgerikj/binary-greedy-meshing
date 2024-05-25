@@ -233,28 +233,27 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           bitsHere &= ~(1ull << bitPos);
 
           const uint8_t type = voxels[getAxisIndex(axis, right + 1, forward + 1, bitPos)];
-          uint8_t* forwardMergedPtr = &forwardMerged[rightCS + (bitPos - 1)];
+          uint8_t& forwardMergedRef = forwardMerged[rightCS + (bitPos - 1)];
 
           if (rightMerged[bitPos - 1] == 0 && (bitsForward >> bitPos & 1) && type == voxels[getAxisIndex(axis, right + 1, forward + 2, bitPos)]) {
-            (*forwardMergedPtr)++;
+            forwardMergedRef++;
             continue;
           }
 
-          if ((bitsRight >> bitPos & 1) && (*forwardMergedPtr) == forwardMerged[(rightCS + CS) + (bitPos - 1)]
-            && type == voxels[getAxisIndex(axis, right + 2, forward + 1, bitPos)]) {
-            (*forwardMergedPtr) = 0;
+          if ((bitsRight >> bitPos & 1) && forwardMergedRef == forwardMerged[(rightCS + CS) + (bitPos - 1)] && type == voxels[getAxisIndex(axis, right + 2, forward + 1, bitPos)]) {
+            forwardMergedRef = 0;
             rightMerged[bitPos - 1]++;
             continue;
           }
 
           const uint8_t meshLeft = right - rightMerged[bitPos - 1];
-          const uint8_t meshFront = forward - (*forwardMergedPtr);
+          const uint8_t meshFront = forward - forwardMergedRef;
           const uint8_t meshUp = bitPos - 1 + (~face & 1);
 
           const uint8_t meshWidth = 1 + rightMerged[bitPos - 1];
-          const uint8_t meshLength = 1 + (*forwardMergedPtr);
+          const uint8_t meshLength = 1 + forwardMergedRef;
 
-          (*forwardMergedPtr) = 0;
+          forwardMergedRef = 0;
           rightMerged[bitPos - 1] = 0;
 
           const uint64_t quad = getQuad(meshLeft + (face == 4 ? meshWidth : 0), meshFront, meshUp, meshWidth, meshLength, type);
