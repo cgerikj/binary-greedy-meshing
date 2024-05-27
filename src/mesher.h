@@ -236,14 +236,13 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
           const uint8_t type = voxels[getAxisIndex(axis, right + 1, forward + 1, bitPos)];
           uint8_t& forwardMergedRef = forwardMerged[rightCS + (bitPos - 1)];
           uint8_t& rightMergedRef = rightMerged[bitPos - 1];
-
+          
           if (rightMergedRef == 0 && (bitsForward >> bitPos & 1) && type == voxels[getAxisIndex(axis, right + 1, forward + 2, bitPos)]) {
             forwardMergedRef++;
             continue;
           }
-
-          if ((bitsRight >> bitPos & 1) && forwardMergedRef == forwardMerged[(rightCS + CS) + (bitPos - 1)]
-            && type == voxels[getAxisIndex(axis, right + 2, forward + 1, bitPos)]) {
+          
+          if ((bitsRight >> bitPos & 1) && forwardMergedRef == forwardMerged[(rightCS + CS) + (bitPos - 1)] && type == voxels[getAxisIndex(axis, right + 2, forward + 1, bitPos)]) {
             forwardMergedRef = 0;
             rightMergedRef++;
             continue;
@@ -258,7 +257,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
 
           forwardMergedRef = 0;
           rightMergedRef = 0;
-
+          
           const uint64_t quad = getQuad(meshLeft + (face == 4 ? meshWidth : 0), meshFront, meshUp, meshWidth, meshLength, type);
 
           insertQuad(*meshData.vertices, quad, vertexI, meshData.maxVertices);
