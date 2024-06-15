@@ -24,8 +24,8 @@ public:
   float pitch = PITCH;
   float mouseSensitivity = SENSITIVITY;
   float fov = FOV;
-  float nearD = 0.01f;
-  float farD = 1000.0f;
+  float nearD = 1.0f;
+  float farD = 10000.0f;
   float ratio;
 
   Camera(glm::vec3 position) : position(position) {

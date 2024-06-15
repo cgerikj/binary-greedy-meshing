@@ -25,10 +25,10 @@ public:
     t1 = std::chrono::high_resolution_clock::now();
   }
 
-  int end() {
+  long long end() {
     if (!started || ended) return 0;
     auto t2 = std::chrono::high_resolution_clock::now();
-    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+    long long duration_us = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     auto duration_ms = duration_us / 1000.0f;
     if (description != "") {
       std::cout << description << " took " << duration_us << "us (" << duration_ms << "ms)" << std::endl;

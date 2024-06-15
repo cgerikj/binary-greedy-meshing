@@ -8,19 +8,33 @@
 #include "misc/noise.h"
 #include "misc/utility.h"
 #include "misc/timer.h"
+#include "rendering/chunk_renderer.h"
+#include "data/level_file.h"
+#include "data/rle.h"
+#include "cxxpool.h"
+#include <thread>
 
 #define BM_IMPLEMENTATION
 #include "mesher.h"
 
-void create_chunk();
+void createTestChunk();
+
+const std::string DEMO_LEVEL_FILE = "demo_terrain_96";
+
+const int WINDOW_WIDTH = 1920;
+const int WINDOW_HEIGHT = 1080;
+const bool FULLSCREEN = false;
+
+const int MESHING_THREADS = std::max((std::thread::hardware_concurrency() / 2) - 1, 2u);
+const int MAX_MESHING_FUTURES = MESHING_THREADS * 4;
 
 GLFWwindow* init_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_SAMPLES, 4);
+  glfwWindowHint(GLFW_SAMPLES, 2);
 
-  GLFWwindow* window = glfwCreateWindow(1280, 720, "Binary Greedy Meshing", nullptr, nullptr);
+  GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Binary Greedy Meshing V2", FULLSCREEN ? glfwGetPrimaryMonitor() : nullptr, nullptr);
   if (!window) {
     fprintf(stderr, "Unable to create GLFW window\n");
     glfwDestroyWindow(window);
@@ -99,16 +113,39 @@ Noise noise;
 float last_x = 0.0f;
 float last_y = 0.0f;
 
-enum class MESH_TYPE: int {
-  TERRAIN,
+enum class MESH_TYPE : int {
   SPHERE,
+  TERRAIN,
   RANDOM,
   CHECKERBOARD,
   EMPTY,
   Count
 };
 
-int mesh_type = (int)MESH_TYPE::TERRAIN;
+int mesh_type = (int) MESH_TYPE::SPHERE;
+
+struct ChunkRenderData {
+  glm::ivec3 chunkPos = glm::ivec3(0);
+  std::vector<DrawElementsIndirectCommand*> faceDrawCommands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+};
+
+struct ThreadData {
+  uint8_t* voxels;
+  MeshData* meshData;
+};
+
+struct MeshingResponse {
+  ChunkTableEntry* tableEntry;
+  ThreadData* threadData;
+  long long decompressionDurationUs;
+  long long meshingDurationUs;
+};
+
+MeshData mainThreadMeshData;
+ChunkRenderer chunkRenderer;
+std::vector<ChunkRenderData> chunkRenderData;
+ChunkRenderData testChunkRenderData;
+LevelFile levelFile;
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   camera->processMouseMovement(xpos - last_x, last_y - ypos);
@@ -126,8 +163,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     glGetIntegerv(GL_POLYGON_MODE, lastPolyMode);
     if (lastPolyMode[0] == GL_FILL) {
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-    else {
+    } else {
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
   }
@@ -137,48 +173,50 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   }
 
   else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
-    create_chunk();
+    createTestChunk();
   }
 
   else if (key == GLFW_KEY_TAB && action == GLFW_RELEASE) {
     mesh_type++;
-    if (mesh_type >= (int)MESH_TYPE::Count) {
+    if (mesh_type >= (int) MESH_TYPE::Count) {
       mesh_type = 0;
     }
-    create_chunk();
+    createTestChunk();
   }
 }
 
-GLuint VAO, VBO;
-
-MeshData meshData;
-
-bool bake_ao = true;
-
-void create_chunk() {
-  std::vector<uint8_t> voxels(CS_P3);
-  std::fill(voxels.begin(), voxels.end(), 0);
+void createTestChunk() {
+  uint8_t* voxels = new uint8_t[CS_P3] { 0 };
+  memset(voxels, 0, CS_P3);
+  memset(mainThreadMeshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
 
   switch (mesh_type) {
-    case (int)MESH_TYPE::TERRAIN: {
-      noise.generateTerrain(voxels, 30);
+    case (int) MESH_TYPE::TERRAIN: {
+      noise.generateTerrainV1(voxels, mainThreadMeshData.opaqueMask, 30);
       break;
     }
 
-    case (int)MESH_TYPE::RANDOM: {
-      noise.generateWhiteNoiseTerrain(voxels, 30);
+    case (int) MESH_TYPE::RANDOM: {
+      noise.generateWhiteNoiseTerrain(voxels, mainThreadMeshData.opaqueMask, 30);
       break;
     }
 
-    case (int)MESH_TYPE::CHECKERBOARD: {
+    case (int) MESH_TYPE::CHECKERBOARD: {
       for (int x = 1; x < CS_P; x++) {
         for (int y = 1; y < CS_P; y++) {
           for (int z = 1; z < CS_P; z++) {
             if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
-              voxels.at(get_yzx_index(x, y, z)) = 1;
-              voxels.at(get_yzx_index(x - 1, y - 1, z)) = 2;
-              voxels.at(get_yzx_index(x - 1, y, z - 1)) = 3;
-              voxels.at(get_yzx_index(x, y - 1, z - 1)) = 4;
+              voxels[get_yzx_index(x, y, z)] = 1;
+              mainThreadMeshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
+
+              voxels[get_yzx_index(x - 1, y - 1, z)] = 2;
+              mainThreadMeshData.opaqueMask[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
+
+              voxels[get_yzx_index(x - 1, y, z - 1)] = 3;
+              mainThreadMeshData.opaqueMask[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
+
+              voxels[get_yzx_index(x, y - 1, z - 1)] = 4;
+              mainThreadMeshData.opaqueMask[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
             }
           }
         }
@@ -186,13 +224,14 @@ void create_chunk() {
       break;
     }
 
-    case (int)MESH_TYPE::SPHERE: {
+    case (int) MESH_TYPE::SPHERE: {
       int r = CS_P / 2;
       for (int x = -r; x < r; x++) {
         for (int y = -r; y < r; y++) {
           for (int z = -r; z < r; z++) {
             if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
-              voxels.at(get_yzx_index(x+r, y+r, z+r)) = 1;
+              voxels[get_yzx_index(x + r, y + r, z + r)] = 8;
+              mainThreadMeshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
             }
           }
         }
@@ -200,33 +239,61 @@ void create_chunk() {
       break;
     }
 
-    case (int)MESH_TYPE::EMPTY: {
+    case (int) MESH_TYPE::EMPTY: {
       // empty!
       break;
     }
   }
 
   {
-    int iterations = 1;
-    Timer timer(std::to_string(iterations) + " iterations " + (bake_ao ? "(AO)" : "(No AO)"), true);
+    int iterations = 1000;
+    Timer timer(std::to_string(iterations) + " iterations", true);
 
     for (int i = 0; i < iterations; i++) {
-      mesh(voxels, meshData, bake_ao);
+      mesh(voxels, mainThreadMeshData);
     }
-
-    bake_ao = !bake_ao;
   }
 
-  if (meshData.vertexCount) {
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, meshData.vertexCount * sizeof(uint32_t), meshData.vertices->data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+  for (auto& cmd : testChunkRenderData.faceDrawCommands) {
+    if (cmd) {
+      chunkRenderer.removeDrawCommand(cmd);
+      delete cmd;
+      cmd = nullptr;
+    }
   }
 
-  printf("vertex count: %i\n", meshData.vertexCount);
+  if (mainThreadMeshData.vertexCount) {
+    uint32_t y = 0;
+    glm::ivec3 chunkPos = glm::ivec3(levelFile.getSize() / 2, 1, levelFile.getSize() / 2);
+
+    for (uint32_t i = 0; i <= 5; i++) {
+      if (mainThreadMeshData.faceVertexLength[i]) {
+        uint32_t baseInstance = (i << 24) | (chunkPos.z << 16) | (chunkPos.y << 8) | chunkPos.x;
+
+        auto drawCommand = chunkRenderer.getDrawCommand(mainThreadMeshData.faceVertexLength[i], baseInstance);
+
+        testChunkRenderData.faceDrawCommands[i] = drawCommand;
+
+        chunkRenderer.buffer(*drawCommand, mainThreadMeshData.vertices->data() + mainThreadMeshData.faceVertexBegin[i]);
+      }
+    }
+  }
+
+  printf("vertex count: %i\n", mainThreadMeshData.vertexCount);
 }
+
+auto meshLambda = [](ChunkTableEntry* tableEntry, ThreadData* threadData) -> MeshingResponse {
+  Timer decompressionTimer("", true);
+  memset(threadData->meshData->opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+  rle::decompressToVoxelsAndOpaqueMask(levelFile.buffer.data() + tableEntry->rleDataBegin, tableEntry->rleDataSize, threadData->voxels, threadData->meshData->opaqueMask);
+  auto decompressionDurationUs = decompressionTimer.end();
+
+  Timer meshingTimer("", true);
+  mesh(threadData->voxels, *threadData->meshData);
+  auto meshingDurationUs = meshingTimer.end();
+
+  return MeshingResponse({ tableEntry, threadData, decompressionDurationUs, meshingDurationUs });
+};
 
 int main(int argc, char* argv[]) {
   glfwSetErrorCallback(glfw_error_callback);
@@ -241,7 +308,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   glfwSetWindowPos(window, 0, 31);
-  glfwSwapInterval(1);
+  glfwSwapInterval(0);
 
   glfwSetCursorPosCallback(window, mouse_callback);
   glfwSetKeyCallback(window, key_callback);
@@ -251,33 +318,147 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
+  mainThreadMeshData.opaqueMask = new uint64_t[CS_P2] { 0 };
+  mainThreadMeshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
+  mainThreadMeshData.forwardMerged = new uint8_t[CS_2] { 0 };
+  mainThreadMeshData.rightMerged = new uint8_t[CS] { 0 };
+  mainThreadMeshData.vertices = new std::vector<uint64_t>(10000);
+  mainThreadMeshData.maxVertices = 10000;
 
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBindVertexArray(VAO);
-  glEnableVertexAttribArray(0);
-  glVertexAttribIPointer(0, sizeof(uint32_t), GL_UNSIGNED_INT, sizeof(uint32_t), (void*)0);
-  glBindVertexArray(0);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  chunkRenderer.init();
 
-  meshData.vertices = new std::vector<uint32_t>(10000);
-  meshData.maxVertices = 10000;
-  meshData.col_face_masks = new std::vector<uint64_t>(CS_P2 * 6);
-  meshData.a_axis_cols = new std::vector<uint64_t>(CS_P2);
-  meshData.b_axis_cols = new std::vector<uint64_t>(CS_P);
-  meshData.merged_right = new std::vector<uint64_t>(CS_P);
-  meshData.merged_forward = new std::vector<uint64_t>(CS_P2);
+  // Load
+  if (true) {
+    {
+      Timer loadFileTimer("loading level file", true);
+      levelFile.loadFromFile(DEMO_LEVEL_FILE);
+    }
 
-  create_chunk();
+    long long totalMeshingDurationUs = 0;
+    long long totalDecompressionDurationUs = 0;
+    long long totalMeshBufferingDurationUs = 0;
+
+    // Create a temporary thread pool for meshing all chunks on load
+    cxxpool::thread_pool threadPool{ (size_t)MESHING_THREADS };
+    std::unordered_map<uint32_t, std::future<MeshingResponse>> meshFutures;
+
+    // Create MAX_MESHING_FUTURES instances of ThreadData
+    std::queue<ThreadData*> threadingMeshData = {};
+    for (int i = 0; i < MAX_MESHING_FUTURES; i++) {
+      auto meshData = new MeshData();
+      meshData->opaqueMask = new uint64_t[CS_P2] { 0 };
+      meshData->faceMasks = new uint64_t[CS_2 * 6] { 0 };
+      meshData->forwardMerged = new uint8_t[CS_2] { 0 };
+      meshData->rightMerged = new uint8_t[CS] { 0 };
+      meshData->vertices = new std::vector<uint64_t>(10000);
+      meshData->maxVertices = 10000;
+      auto threadData = new ThreadData();
+      threadData->meshData = meshData;
+      threadData->voxels = new uint8_t[CS_P3] { 0 };
+      threadingMeshData.push(threadData);
+    }
+
+    // Create a queue of all chunks
+    std::queue<ChunkTableEntry*> meshQueue = {};
+    for (auto& tableEntry : levelFile.chunkTable) {
+      meshQueue.push(&tableEntry);
+    }
+
+    while (meshFutures.size() || meshQueue.size()) {
+
+      // Create new futures
+      while (meshFutures.size() < MAX_MESHING_FUTURES && threadingMeshData.size() && meshQueue.size()) {
+        auto threadData = threadingMeshData.front();
+        threadingMeshData.pop();
+
+        ChunkTableEntry* entry = meshQueue.front();
+        meshQueue.pop();
+
+        meshFutures.emplace(entry->key, threadPool.push(meshLambda, entry, threadData));
+      }
+
+      // Handle completed futures
+      std::vector<uint32_t> finishedMeshKeys;
+      for (auto& [future_key, future] : meshFutures) {
+        if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+          finishedMeshKeys.push_back(future_key);
+
+          auto response = future.get();
+          threadingMeshData.push(response.threadData);
+
+          auto meshData = *response.threadData->meshData;
+          totalDecompressionDurationUs += response.decompressionDurationUs;
+          totalMeshingDurationUs += response.meshingDurationUs;
+
+          Timer meshBufferingTimer("", true);
+          if (meshData.vertexCount) {
+            uint32_t y = 0;
+            glm::ivec3 chunkPos = parse_xyz_key(response.tableEntry->key);
+            std::vector<DrawElementsIndirectCommand*> commands = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+
+            for (uint32_t i = 0; i <= 5; i++) {
+              if (response.threadData->meshData->faceVertexLength[i]) {
+                uint32_t baseInstance = (i << 24) | (chunkPos.z << 16) | (chunkPos.y << 8) | chunkPos.x;
+
+                auto drawCommand = chunkRenderer.getDrawCommand(meshData.faceVertexLength[i], baseInstance);
+
+                commands[i] = drawCommand;
+
+                chunkRenderer.buffer(*drawCommand, meshData.vertices->data() + meshData.faceVertexBegin[i]);
+              }
+            }
+            chunkRenderData.push_back(ChunkRenderData({ chunkPos, commands }));
+          }
+          totalMeshBufferingDurationUs += meshBufferingTimer.end();
+        }
+      }
+
+      for (auto key : finishedMeshKeys) {
+        meshFutures.erase(key);
+      }
+    }
+
+    // TODO: Clean up memory!
+
+    printf("\n------------------------------------\n");
+    printf("Finished loading %llu chunks:\n", levelFile.chunkTable.size());
+    printf("\  Decompression: %lluus avg\n", totalDecompressionDurationUs / levelFile.chunkTable.size());
+    printf("\  Meshing: %lluus avg \n", totalMeshingDurationUs / levelFile.chunkTable.size());
+    printf("\  Buffering: %lluus avg \n", totalMeshBufferingDurationUs / levelFile.chunkTable.size());
+    printf("------------------------------------\n\n");
+  }
+
+  // Generate terrain
+  else {
+    int size = 16;
+    levelFile.initialize(size);
+
+    std::vector<uint8_t>* voxels = new std::vector<uint8_t>(CS_P3);
+    for (uint32_t x = 0; x < size; x++) {
+      for (uint32_t z = 0; z < size; z++) {
+        uint32_t y = 0;
+
+        memset(voxels->data(), 0, CS_P3);
+        memset(mainThreadMeshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+
+        noise.generateTerrainV2(voxels->data(), mainThreadMeshData.opaqueMask, x, z, 30);
+
+        levelFile.compressAndAddChunk(*voxels, get_xyz_key(x, y, z));
+      }
+    }
+
+    levelFile.saveToFile("demo_terrain_" + std::to_string(size));
+  }
+
+  createTestChunk();
 
   shader = new Shader("main", "main");
-  camera = new Camera(glm::vec3(31, 65, -5));
-  camera->handleResolution(1280, 720);
+  camera = new Camera(glm::vec3(levelFile.getSize() * CS / 2, 100, (levelFile.getSize() * CS / 2) - 30));
+  camera->handleResolution(WINDOW_WIDTH, WINDOW_HEIGHT);
 
   float forwardMove = 0.0f;
   float rightMove = 0.0f;
-  float noclipSpeed = 30.0f;
+  float noclipSpeed = 250.0f;
 
   float deltaTime = 0.0f;
 
@@ -299,15 +480,60 @@ int main(int argc, char* argv[]) {
     auto wishdir = (camera->front * forwardMove) + (camera->right * rightMove);
     camera->position += noclipSpeed * wishdir * deltaTime;
 
-    if (meshData.vertexCount > 0) {
-      shader->use();
-      shader->setMat4("u_projection", camera->projection);
-      shader->setMat4("u_view", camera->getViewMatrix());
-      shader->setVec3("eye_position", camera->position);
-      glBindVertexArray(VAO);
-      glDrawArrays(GL_TRIANGLES, 0, meshData.vertexCount);
-      glBindVertexArray(0);
+    for (const auto& testCmd : testChunkRenderData.faceDrawCommands) {
+      if (testCmd) {
+        chunkRenderer.addDrawCommand(*testCmd);
+      }
     }
+
+    glm::ivec3 cameraChunkPos = glm::floor(camera->position / glm::vec3(CS));
+
+    for (const auto& data : chunkRenderData) {
+      for (int i = 0; i < 6; i++) {
+        auto& d = data.faceDrawCommands[i];
+        if (d) {
+          switch (i) {
+            case 0:
+              if (cameraChunkPos.y >= data.chunkPos.y) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 1:
+              if (cameraChunkPos.y <= data.chunkPos.y) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 2:
+              if (cameraChunkPos.x >= data.chunkPos.x) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 3:
+              if (cameraChunkPos.x <= data.chunkPos.x) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 4:
+              if (cameraChunkPos.z >= data.chunkPos.z) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+
+            case 5:
+              if (cameraChunkPos.z <= data.chunkPos.z) {
+                chunkRenderer.addDrawCommand(*d);
+              }
+              break;
+          }
+        }
+      }
+    }
+
+    chunkRenderer.render(*shader, *camera);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
