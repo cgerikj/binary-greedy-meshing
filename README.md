@@ -16,7 +16,7 @@ The chunks in the screenshot were meshed at an average of **74us** single-thread
 
 Chunks with a maximum size of 64x64x64 are supported, including neighboring chunk data.
 
-**Check out the v1.0.0 branch for version 1 which supports baked AO.**
+**Check out the [v1.0.0](https://github.com/cgerikj/binary-greedy-meshing/tree/v1.0.0) branch for version 1 which supports baked AO.**
 
 ## How does it work?
 
