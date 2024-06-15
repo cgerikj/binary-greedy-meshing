@@ -7,11 +7,16 @@
 
 **Voxel meshing algorithm that creates large quads using extremely fast bitwise operations.**
 
-Execution time for a single chunk typically ranges from **50us** to **200us**. The chunks in the screenshot were meshed at an average of **74us** single-threaded and **108us** in a thread pool. (Ryzen 3800x).
+**Version 2 is several times faster compared to version 1 thanks to contributions by:  
+Ethan Gore ([Youtube Channel](https://www.youtube.com/@ethangore8697), [Github](https://github.com/kryyptor))  
+Finding Fortune ([Youtube Channel](https://www.youtube.com/@Finding_Fortune), [Github](https://github.com/Finding-Fortune))**
+
+Execution time for a single chunk typically ranges from **50us** to **200us**.  
+The chunks in the screenshot were meshed at an average of **74us** single-threaded and **108us** in a thread pool. (Ryzen 3800x).
 
 Chunks with a maximum size of 64x64x64 are supported, including neighboring chunk data.
 
-Check out the v1.0.0 branch for version 1 which supports baked AO.
+**Check out the v1.0.0 branch for version 1 which supports baked AO.**
 
 ## How does it work?
 
