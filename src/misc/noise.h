@@ -29,8 +29,8 @@ public:
           float val = ((noise1.GetSimplexFractal(x, y, z)) + 1.0f) / 2.0f;
 
           if (val > glm::smoothstep(0.15f, 1.0f, (float) y / (float) CS_P)) {
-            int i = get_yzx_index(x, y, z);
-            int i_above = get_yzx_index(x, y + 1, z);
+            int i = get_zxy_index(x, y, z);
+            int i_above = get_zxy_index(x, y + 1, z);
 
             opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
@@ -56,10 +56,10 @@ public:
         for (int z = 0; z < CS_P; z++) {
           float val = (noise2.GetSimplexFractal((offsetX * CS) + x, y, (offsetZ * CS) + z) + 0.6f) / 1.35f;
 
-          int i = get_yzx_index(x, y, z);
+          int i = get_zxy_index(x, y, z);
 
           if (val > (float) y / (float) CS_P) {
-            int i_above = get_yzx_index(x, y + 1, z);
+            int i_above = get_zxy_index(x, y + 1, z);
 
             opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
@@ -88,7 +88,7 @@ public:
       for (int y = CS_P; y--;) {
         for (int z = 1; z < CS_P; z++) {
           float noise = (whiteNoise.GetWhiteNoise(x, y, z));
-          int i = get_yzx_index(x, y, z);
+          int i = get_zxy_index(x, y, z);
 
           if (noise > 0.5f) opaqueMask[(y * CS_P) + x] |= 1ull << z;
 

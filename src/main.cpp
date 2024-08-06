@@ -206,16 +206,16 @@ void createTestChunk() {
         for (int y = 1; y < CS_P; y++) {
           for (int z = 1; z < CS_P; z++) {
             if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
-              voxels[get_yzx_index(x, y, z)] = 1;
+              voxels[get_zxy_index(x, y, z)] = 1;
               mainThreadMeshData.opaqueMask[(y * CS_P) + x] |= 1ull << z;
 
-              voxels[get_yzx_index(x - 1, y - 1, z)] = 2;
+              voxels[get_zxy_index(x - 1, y - 1, z)] = 2;
               mainThreadMeshData.opaqueMask[((y - 1) * CS_P) + (x - 1)] |= 1ull << z;
 
-              voxels[get_yzx_index(x - 1, y, z - 1)] = 3;
+              voxels[get_zxy_index(x - 1, y, z - 1)] = 3;
               mainThreadMeshData.opaqueMask[(y * CS_P) + (x - 1)] |= 1ull << (z - 1);
 
-              voxels[get_yzx_index(x, y - 1, z - 1)] = 4;
+              voxels[get_zxy_index(x, y - 1, z - 1)] = 4;
               mainThreadMeshData.opaqueMask[((y - 1) * CS_P) + x] |= 1ull << (z - 1);
             }
           }
@@ -230,7 +230,7 @@ void createTestChunk() {
         for (int y = -r; y < r; y++) {
           for (int z = -r; z < r; z++) {
             if (std::sqrt(x * x + y * y + z * z) < 30.0f) {
-              voxels[get_yzx_index(x + r, y + r, z + r)] = 8;
+              voxels[get_zxy_index(x + r, y + r, z + r)] = 8;
               mainThreadMeshData.opaqueMask[((y + r) * CS_P) + (x + r)] |= 1ull << (z + r);
             }
           }
