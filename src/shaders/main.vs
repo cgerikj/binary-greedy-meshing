@@ -52,19 +52,23 @@ void main() {
   uint quadData1 = data[ssboIndex].quadData1;
   uint quadData2 = data[ssboIndex].quadData2;
 
-  vec3 vertexPos = ivec3(quadData1, quadData1 >> 6u, quadData1 >> 12u) & 63;
-  vertexPos += chunkOffsetPos;
+  ivec3 iVertexPos = ivec3(quadData1, quadData1 >> 6u, quadData1 >> 12u) & 63;
+  iVertexPos += chunkOffsetPos;
 
   int w = int((quadData1 >> 18u)&63u), h = int((quadData1 >> 24u)&63u);
   uint wDir = (face & 2) >> 1, hDir = 2 - (face >> 2);
   int wMod = vertexID >> 1, hMod = vertexID & 1;
 
-  vertexPos[wDir] += (w * wMod * flipLookup[face]) + (0.001 * flipLookup[face] * (wMod * 2 - 1));
-  vertexPos[hDir] += (h * hMod) + (0.001 * (hMod * 2 - 1));
+  iVertexPos[wDir] += (w * wMod * flipLookup[face]);
+  iVertexPos[hDir] += (h * hMod);
 
-  vs_out.pos = vertexPos;
+  vs_out.pos = iVertexPos;
   vs_out.normal = normalLookup[face];
   vs_out.color = colorLookup[(quadData2&255u) - 1];
-  
-  gl_Position = u_projection * u_view * vec4(vertexPos - eye_position_int, 1);
+
+  vec3 vertexPos = iVertexPos - eye_position_int;
+  vertexPos[wDir] += 0.0007 * flipLookup[face] * (wMod * 2 - 1);
+  vertexPos[hDir] += 0.0007 * (hMod * 2 - 1);
+
+  gl_Position = u_projection * u_view * vec4(vertexPos, 1);
 }
