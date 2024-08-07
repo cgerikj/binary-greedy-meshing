@@ -156,6 +156,9 @@ public:
     shader.setMat4("u_view", camera.getViewMatrix());
     shader.setVec3("eye_position", camera.position);
 
+    glm::ivec3 intCamPosition = glm::ivec3(floor(camera.position));
+    shader.setIVec3("eye_position_int", intCamPosition);
+
     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, commandBuffer);
     glBufferData(GL_DRAW_INDIRECT_BUFFER, numCommands * sizeof(DrawElementsIndirectCommand), drawCommands.data(), GL_DYNAMIC_DRAW);
 
