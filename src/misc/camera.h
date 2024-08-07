@@ -46,7 +46,8 @@ public:
   }
 
   glm::mat4 getViewMatrix() {
-    return glm::lookAt(position, position + front, up);
+    glm::vec3 intraVoxelPos = position - floor(position);
+    return glm::lookAt(intraVoxelPos, intraVoxelPos + front, up);
   }
 
   void processMouseMovement(float xOffset, float yOffset) {
