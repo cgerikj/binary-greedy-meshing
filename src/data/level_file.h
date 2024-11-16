@@ -19,6 +19,12 @@
 * The rest of the buffer contain the chunks. Indices in the table origate from byte 0 in the buffer.
 */
 
+#if defined _WIN32 || defined __CYGWIN__
+#define FILESEP "\\"
+#else
+#define FILESEP "/"
+#endif
+
 struct ChunkTableEntry {
   uint32_t key, rleDataBegin, rleDataSize;
 };
@@ -42,7 +48,7 @@ public:
   }
 
   void loadFromFile(std::string levelName) {
-    std::ifstream file("..\\levels\\" + levelName, std::ios::binary);
+    std::ifstream file(".." FILESEP "levels" FILESEP + levelName, std::ios::binary);
     file.unsetf(std::ios::skipws);
 
     if (file.is_open()) {
@@ -91,7 +97,7 @@ public:
 
     buffer.resize(dataBufferHead + 1);
 
-    std::string saveDir = "..\\levels\\";
+    std::string saveDir = ".." PATHSEP "levels" PATHSEP;
     std::filesystem::create_directory(saveDir);
 
     std::ofstream file;

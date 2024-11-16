@@ -2,6 +2,7 @@
 #define RLE_H
 
 #include <vector>
+#include <cstring>
 
 inline void addRleRun(std::vector<uint8_t>& rleVoxels, uint8_t type, uint32_t length) {
   uint8_t subLength = 0;
