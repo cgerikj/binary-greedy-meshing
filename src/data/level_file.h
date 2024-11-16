@@ -20,9 +20,9 @@
 */
 
 #if defined _WIN32 || defined __CYGWIN__
-#define FILESEP "\\"
+#define PATH_SEP "\\"
 #else
-#define FILESEP "/"
+#define PATH_SEP "/"
 #endif
 
 struct ChunkTableEntry {
@@ -48,7 +48,7 @@ public:
   }
 
   void loadFromFile(std::string levelName) {
-    std::ifstream file(".." FILESEP "levels" FILESEP + levelName, std::ios::binary);
+    std::ifstream file(".." PATH_SEP "levels" PATH_SEP + levelName, std::ios::binary);
     file.unsetf(std::ios::skipws);
 
     if (file.is_open()) {
@@ -97,7 +97,7 @@ public:
 
     buffer.resize(dataBufferHead + 1);
 
-    std::string saveDir = ".." PATHSEP "levels" PATHSEP;
+    std::string saveDir = ".." PATH_SEP "levels" PATH_SEP;
     std::filesystem::create_directory(saveDir);
 
     std::ofstream file;
