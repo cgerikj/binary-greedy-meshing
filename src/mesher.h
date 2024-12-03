@@ -183,9 +183,9 @@ void mesh(const BM_VECTOR<uint8_t>& voxels, MeshData& meshData, bool bake_ao) {
 
   // Begin culling faces
   auto p = voxels.begin();
-  BM_MEMSET(a_axis_cols.data(), 0, CS_P2);
+  BM_MEMSET(a_axis_cols.data(), 0, CS_P2 * sizeof(uint64_t));
   for (int a = 0; a < CS_P; a++) {
-    BM_MEMSET(b_axis_cols.data(), 0, CS_P * 8);
+    BM_MEMSET(b_axis_cols.data(), 0, CS_P * sizeof(uint64_t));
 
     for (int b = 0; b < CS_P; b++) {
       uint64_t cb = 0;
