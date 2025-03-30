@@ -43,6 +43,12 @@ The last 4 bytes only utilize 8 bits for voxel type data.
 ## Rendering
 The demo project ships with a fast renderer that uses vertex pulling. All chunks are rendered in one draw call using glMultiDrawElementsIndirect. Faces facing away from the camera are not rendered.
 
+## T-junctions
+To reduce artifacts from T-junctions (when a quad edge meets the middle of another), the renderer does the following:
+
+1. Quads are rendered slightly larger (~1px) to hide/cover small gaps.
+2. Vertex positions are calculated in eye-space to improve float accuracy, especially at larger coordinates.
+
 ## Demo
 When the program is started, a 96x96 chunk (5952x5952 voxels) file is loaded from disk and meshed in a few seconds (multi-threaded).
 
