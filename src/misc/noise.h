@@ -48,6 +48,34 @@ public:
     }
   }
 
+  void generateTerrainV1Transparent(uint8_t* voxels, uint64_t* transparentMask, int seed) {
+    noise1.SetSeed(seed);
+
+    for (int x = 0; x < CS_P; x++) {
+      for (int y = CS_P - 1; y--;) {
+        for (int z = 0; z < CS_P; z++) {
+          float val = ((noise1.GetSimplexFractal(x, y, z)) + 1.0f) / 2.0f;
+
+          if (val > glm::smoothstep(0.15f, 1.0f, (float) y / (float) CS_P)) {
+            int i = get_zxy_index(x, y, z);
+            int i_above = get_zxy_index(x, y + 1, z);
+
+            transparentMask[(y * CS_P) + x] |= 1ull << z;
+
+            switch (voxels[i_above]) {
+            case 0:
+              voxels[i] = 10;
+              break;
+            default:
+              voxels[i] = 9;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   void generateTerrainV2(uint8_t* voxels, uint64_t* opaqueMask, int offsetX, int offsetZ, int seed) {
     noise2.SetSeed(seed);
 

@@ -1,11 +1,11 @@
 #version 460 core
 
-layout(location=0) out vec3 out_color;
+layout(location=0) out vec4 out_color;
 
 in VS_OUT {
   vec3 pos;
   flat vec3 normal;
-  flat vec3 color;
+  flat vec4 color;
 } fs_in;
 
 uniform vec3 eye_position;
@@ -22,8 +22,9 @@ void main() {
   rim = smoothstep(0.6, 1.0, rim);
 
   out_color = 
-    fs_in.color +
+    vec4(vec3(fs_in.color.rgb +
     (diffuse_color * max(0, dot(L, fs_in.normal))) +
-    (rim_color * vec3(rim, rim, rim))
+    (rim_color * vec3(rim, rim, rim))),
+    fs_in.color.a)
   ;
 }

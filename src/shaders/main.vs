@@ -17,7 +17,7 @@ uniform ivec3 eye_position_int;
 out VS_OUT {
   out vec3 pos;
   flat vec3 normal;
-  flat vec3 color;
+  flat vec4 color;
 } vs_out;
 
 const vec3 normalLookup[6] = {
@@ -29,15 +29,19 @@ const vec3 normalLookup[6] = {
   vec3( 0, 0, -1 )
 };
 
-const vec3 colorLookup[8] = {
-  vec3(0.2, 0.659, 0.839),
-  vec3(0.302, 0.302, 0.302),
-  vec3(0.278, 0.600, 0.141),
-  vec3(0.1, 0.1, 0.6),
-  vec3(0.1, 0.6, 0.6),
-  vec3(0.6, 0.1, 0.6),
-  vec3(0.6, 0.6, 0.1),
-  vec3(0.6, 0.1, 0.1)
+const vec4 colorLookup[10] = {
+  // Opaque colors
+  vec4(0.2, 0.659, 0.839, 1.0),
+  vec4(0.302, 0.302, 0.302, 1.0),
+  vec4(0.278, 0.600, 0.141, 1.0),
+  vec4(0.1, 0.1, 0.6, 1.0),
+  vec4(0.1, 0.6, 0.6, 1.0),
+  vec4(0.6, 0.1, 0.6, 1.0),
+  vec4(0.6, 0.6, 0.1, 1.0),
+  vec4(0.6, 0.1, 0.1, 1.0),
+  // Transparent colors
+  vec4(0.302, 0.302, 0.302, 0.5),
+  vec4(0.278, 0.600, 0.141, 0.5),
 };
 
 const int flipLookup[6] = int[6](1, -1, -1, 1, -1, 1);

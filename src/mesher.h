@@ -110,7 +110,7 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
   int vertexI = 0;
 
   uint64_t* opaqueMask = meshData.opaqueMask;
-  uint64_t* transparentMask = meshData.opaqueMask;
+  uint64_t* transparentMask = meshData.transparentMask;
   uint64_t* faceMasks = meshData.faceMasks;
   uint8_t* forwardMerged = meshData.forwardMerged;
   uint8_t* rightMerged = meshData.rightMerged;
@@ -156,15 +156,18 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
         #endif
         bits_here &= ~(1ull << bitPos);
 
-        if (bitPos == 0) continue;
+        if (bitPos == 0 || bitPos >= CS+1) continue;
 
-        const int abc = ab + bitPos;
-        const uint16_t v1 = voxels[abc];
-        // Add faces where the neighboring block is different or air
+        const int abc = ab_ + bitPos;
+        const uint8_t v1 = voxels[abc];
+        // The transparent step is slower than the opaque step 
+        // because we need to check if neighboring transparent blocks are differents (we don't care about that for opaque blocks)
         faceMasks[up_faces] |= (static_cast<uint64_t>(v1 != voxels[abc + CS_P2]) << (bitPos - 1));
         faceMasks[down_faces] |= (static_cast<uint64_t>(v1 != voxels[abc - CS_P2]) << (bitPos - 1));
+
         faceMasks[right_faces] |= (static_cast<uint64_t>(v1 != voxels[abc + CS_P]) << (bitPos - 1));
         faceMasks[left_faces] |= (static_cast<uint64_t>(v1 != voxels[abc - CS_P]) << (bitPos - 1));
+
         faceMasks[front_faces] |= (static_cast<uint64_t>(v1 != voxels[abc + 1]) << bitPos);
         faceMasks[back_faces] |= (static_cast<uint64_t>(v1 != voxels[abc - 1]) << bitPos);
       }

@@ -95,6 +95,9 @@ bool init_opengl() {
   glCullFace(GL_BACK);
   glEnable(GL_CULL_FACE);
 
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
   glClearColor(0.529f, 0.808f, 0.922f, 0.0f);
 
   glEnable(GL_MULTISAMPLE);
@@ -116,6 +119,7 @@ float last_y = 0.0f;
 enum class MESH_TYPE : int {
   SPHERE,
   TERRAIN,
+  TRANSPARENT_TERRAIN,
   RANDOM,
   CHECKERBOARD,
   EMPTY,
@@ -194,6 +198,12 @@ void createTestChunk() {
   switch (mesh_type) {
     case (int) MESH_TYPE::TERRAIN: {
       noise.generateTerrainV1(voxels, mainThreadMeshData.opaqueMask, 30);
+      break;
+    }
+
+    case (int) MESH_TYPE::TRANSPARENT_TERRAIN: {
+      noise.generateTerrainV1Transparent(voxels, mainThreadMeshData.transparentMask, 30);
+      std::cout << "YES\n";
       break;
     }
 
