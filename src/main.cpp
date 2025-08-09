@@ -203,7 +203,6 @@ void createTestChunk() {
 
     case (int) MESH_TYPE::TRANSPARENT_TERRAIN: {
       noise.generateTerrainV1Transparent(voxels, mainThreadMeshData.transparentMask, 30);
-      std::cout << "YES\n";
       break;
     }
 

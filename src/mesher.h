@@ -162,14 +162,14 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
         const uint8_t v1 = voxels[abc];
         // The transparent step is slower than the opaque step 
         // because we need to check if neighboring transparent blocks are differents (we don't care about that for opaque blocks)
-        faceMasks[up_faces] |= (static_cast<uint64_t>(v1 != voxels[abc + CS_P2]) << (bitPos - 1));
-        faceMasks[down_faces] |= (static_cast<uint64_t>(v1 != voxels[abc - CS_P2]) << (bitPos - 1));
+        faceMasks[up_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab + CS_P] & (1ull << bitPos)) && v1 != voxels[abc + CS_P2]) << (bitPos - 1));
+        faceMasks[down_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab - CS_P] & (1ull << bitPos)) && v1 != voxels[abc - CS_P2]) << (bitPos - 1));
 
-        faceMasks[right_faces] |= (static_cast<uint64_t>(v1 != voxels[abc + CS_P]) << (bitPos - 1));
-        faceMasks[left_faces] |= (static_cast<uint64_t>(v1 != voxels[abc - CS_P]) << (bitPos - 1));
+        faceMasks[right_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab + 1] & (1ull << bitPos)) && v1 != voxels[abc + CS_P]) << (bitPos - 1));
+        faceMasks[left_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab - 1] & (1ull << bitPos)) && v1 != voxels[abc - CS_P]) << (bitPos - 1));
 
-        faceMasks[front_faces] |= (static_cast<uint64_t>(v1 != voxels[abc + 1]) << bitPos);
-        faceMasks[back_faces] |= (static_cast<uint64_t>(v1 != voxels[abc - 1]) << bitPos);
+        faceMasks[front_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab] & (1ull << (bitPos + 1))) && v1 != voxels[abc + 1]) << bitPos);
+        faceMasks[back_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab] & (1ull << (bitPos - 1))) && v1 != voxels[abc - 1]) << bitPos);
       }
     }
   }
