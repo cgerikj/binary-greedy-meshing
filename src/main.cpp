@@ -95,6 +95,9 @@ bool init_opengl() {
   glCullFace(GL_BACK);
   glEnable(GL_CULL_FACE);
 
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
   glClearColor(0.529f, 0.808f, 0.922f, 0.0f);
 
   glEnable(GL_MULTISAMPLE);
@@ -116,6 +119,7 @@ float last_y = 0.0f;
 enum class MESH_TYPE : int {
   SPHERE,
   TERRAIN,
+  TRANSPARENT_TERRAIN,
   RANDOM,
   CHECKERBOARD,
   EMPTY,
@@ -189,10 +193,16 @@ void createTestChunk() {
   uint8_t* voxels = new uint8_t[CS_P3] { 0 };
   memset(voxels, 0, CS_P3);
   memset(mainThreadMeshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+  memset(mainThreadMeshData.transparentMask, 0, CS_P2 * sizeof(uint64_t));
 
   switch (mesh_type) {
     case (int) MESH_TYPE::TERRAIN: {
       noise.generateTerrainV1(voxels, mainThreadMeshData.opaqueMask, 30);
+      break;
+    }
+
+    case (int) MESH_TYPE::TRANSPARENT_TERRAIN: {
+      noise.generateTerrainV1Transparent(voxels, mainThreadMeshData.transparentMask, 30);
       break;
     }
 
@@ -285,6 +295,7 @@ void createTestChunk() {
 auto meshLambda = [](ChunkTableEntry* tableEntry, ThreadData* threadData) -> MeshingResponse {
   Timer decompressionTimer("", true);
   memset(threadData->meshData->opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+  memset(threadData->meshData->transparentMask, 0, CS_P2 * sizeof(uint64_t));
   rle::decompressToVoxelsAndOpaqueMask(levelFile.buffer.data() + tableEntry->rleDataBegin, tableEntry->rleDataSize, threadData->voxels, threadData->meshData->opaqueMask);
   auto decompressionDurationUs = decompressionTimer.end();
 
@@ -319,6 +330,7 @@ int main(int argc, char* argv[]) {
   }
 
   mainThreadMeshData.opaqueMask = new uint64_t[CS_P2] { 0 };
+  mainThreadMeshData.transparentMask = new uint64_t[CS_P2] { 0 };
   mainThreadMeshData.faceMasks = new uint64_t[CS_2 * 6] { 0 };
   mainThreadMeshData.forwardMerged = new uint8_t[CS_2] { 0 };
   mainThreadMeshData.rightMerged = new uint8_t[CS] { 0 };
@@ -347,6 +359,7 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < MAX_MESHING_FUTURES; i++) {
       auto meshData = new MeshData();
       meshData->opaqueMask = new uint64_t[CS_P2] { 0 };
+      meshData->transparentMask = new uint64_t[CS_P2] { 0 };
       meshData->faceMasks = new uint64_t[CS_2 * 6] { 0 };
       meshData->forwardMerged = new uint8_t[CS_2] { 0 };
       meshData->rightMerged = new uint8_t[CS] { 0 };
@@ -440,6 +453,7 @@ int main(int argc, char* argv[]) {
 
         memset(voxels->data(), 0, CS_P3);
         memset(mainThreadMeshData.opaqueMask, 0, CS_P2 * sizeof(uint64_t));
+        memset(mainThreadMeshData.transparentMask, 0, CS_P2 * sizeof(uint64_t));
 
         noise.generateTerrainV2(voxels->data(), mainThreadMeshData.opaqueMask, x, z, 30);
 

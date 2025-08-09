@@ -55,6 +55,7 @@ static constexpr int CS_P3 = CS_P * CS_P * CS_P;
 struct MeshData {
   uint64_t* faceMasks = nullptr; // CS_2 * 6
   uint64_t* opaqueMask = nullptr; //CS_P2
+  uint64_t* transparentMask = nullptr; //CS_P2
   uint8_t* forwardMerged = nullptr; // CS_2
   uint8_t* rightMerged = nullptr; // CS
   BM_VECTOR<uint64_t>* vertices = nullptr;
@@ -109,27 +110,67 @@ void mesh(const uint8_t* voxels, MeshData& meshData) {
   int vertexI = 0;
 
   uint64_t* opaqueMask = meshData.opaqueMask;
+  uint64_t* transparentMask = meshData.transparentMask;
   uint64_t* faceMasks = meshData.faceMasks;
   uint8_t* forwardMerged = meshData.forwardMerged;
   uint8_t* rightMerged = meshData.rightMerged;
 
   // Hidden face culling
   for (int a = 1; a < CS_P - 1; a++) {
-    const int aCS_P = a * CS_P;
+    const int a_ = a * CS_P;
 
     for (int b = 1; b < CS_P - 1; b++) {
-      const uint64_t columnBits = opaqueMask[(a * CS_P) + b] & P_MASK;
-      const int baIndex = (b - 1) + (a - 1) * CS;
-      const int abIndex = (a - 1) + (b - 1) * CS;
+      const int ab = a_ + b;
+      const uint64_t opaque_col = opaqueMask[ab] & P_MASK;
+      const int ba_index = (b - 1) + (a - 1) * CS;
+      const int ab_index = (a - 1) + (b - 1) * CS;
+      const int up_faces = ba_index + 0 * CS_2;
+      const int down_faces = ba_index + 1 * CS_2;
+      const int right_faces = ab_index + 2 * CS_2;
+      const int left_faces = ab_index + 3 * CS_2;
+      const int front_faces = ba_index + 4 * CS_2;
+      const int back_faces = ba_index + 5 * CS_2;
 
-      faceMasks[baIndex + 0 * CS_2] = (columnBits & ~opaqueMask[aCS_P + CS_P + b]) >> 1;
-      faceMasks[baIndex + 1 * CS_2] = (columnBits & ~opaqueMask[aCS_P - CS_P + b]) >> 1;
+      // Opaque face culling
+      faceMasks[up_faces] = (opaque_col & ~opaqueMask[ab + CS_P]) >> 1;
+      faceMasks[down_faces] = (opaque_col & ~opaqueMask[ab - CS_P]) >> 1;
 
-      faceMasks[abIndex + 2 * CS_2] = (columnBits & ~opaqueMask[aCS_P + (b + 1)]) >> 1;
-      faceMasks[abIndex + 3 * CS_2] = (columnBits & ~opaqueMask[aCS_P + (b - 1)]) >> 1;
+      faceMasks[right_faces] = (opaque_col & ~opaqueMask[ab + 1]) >> 1;
+      faceMasks[left_faces] = (opaque_col & ~opaqueMask[ab - 1]) >> 1;
 
-      faceMasks[baIndex + 4 * CS_2] = columnBits & ~(opaqueMask[aCS_P + b] >> 1);
-      faceMasks[baIndex + 5 * CS_2] = columnBits & ~(opaqueMask[aCS_P + b] << 1);
+      faceMasks[front_faces] = opaque_col & ~(opaqueMask[ab] >> 1);
+      faceMasks[back_faces] = opaque_col & ~(opaqueMask[ab] << 1);
+
+      // Transparent face culling
+      uint64_t bits_here = transparentMask[ab] & P_MASK;
+      if(bits_here == 0) continue;
+
+      const int ab_ = ab * CS_P;
+      while (bits_here) 
+      {
+        unsigned long bitPos;
+        #ifdef _MSC_VER
+        _BitScanForward64(&bitPos, bits_here);
+        #else
+        bitPos = __builtin_ctzll(bits_here);
+        #endif
+        bits_here &= ~(1ull << bitPos);
+
+        if (bitPos == 0 || bitPos >= CS+1) continue;
+
+        const int abc = ab_ + bitPos;
+        const uint8_t v1 = voxels[abc];
+        // The transparent step is slower than the opaque step 
+        // because we need to check if neighboring transparent blocks are differents (we don't care about that for opaque blocks)
+        faceMasks[up_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab + CS_P] & (1ull << bitPos)) && v1 != voxels[abc + CS_P2]) << (bitPos - 1));
+        faceMasks[down_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab - CS_P] & (1ull << bitPos)) && v1 != voxels[abc - CS_P2]) << (bitPos - 1));
+
+        faceMasks[right_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab + 1] & (1ull << bitPos)) && v1 != voxels[abc + CS_P]) << (bitPos - 1));
+        faceMasks[left_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab - 1] & (1ull << bitPos)) && v1 != voxels[abc - CS_P]) << (bitPos - 1));
+
+        faceMasks[front_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab] & (1ull << (bitPos + 1))) && v1 != voxels[abc + 1]) << bitPos);
+        faceMasks[back_faces] |= (static_cast<uint64_t>(!(opaqueMask[ab] & (1ull << (bitPos - 1))) && v1 != voxels[abc - 1]) << bitPos);
+      }
     }
   }
 
